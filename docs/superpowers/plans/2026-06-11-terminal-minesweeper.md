@@ -2609,9 +2609,12 @@ git commit -m "feat: root model routing and program entry point"
 
 ```bash
 gofmt -l . && go vet ./...
+go mod tidy && git diff --exit-code go.mod go.sum
 go test ./... -coverprofile=coverage.out
 go tool cover -func=coverage.out | tail -1
 ```
+
+(`go mod tidy` must be a no-op: Task 1 pre-pinned bubbletea/lipgloss before any import used them, which is fine mid-branch but must be clean at merge.)
 
 Expected: `gofmt -l` prints nothing, `go vet` clean, all tests PASS, total coverage ≥ 80%. If coverage falls short, `go tool cover -html=coverage.out` shows the gaps — add engine/store tests first (they're the meaningful ones), never View-string assertions for coverage's sake.
 
