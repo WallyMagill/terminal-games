@@ -19,9 +19,9 @@
 - Difficulty presets: Beginner 9×9/10 mines, Intermediate 16×16/40, Expert 30×16/99, plus custom width/height/mines.
 - Reveal with numbers 1–8; zero cells flood-fill (BFS) their connected region plus numbered border.
 - First-click safety: first reveal is never a mine. Mines are placed lazily on first reveal with the clicked cell excluded (classic rule — first click may still be a number; no guaranteed-opening variant).
-- Flag cycle on hidden cells: hidden → flagged → question mark → hidden. Flagged cells cannot be revealed.
-- Chording: activating a revealed number whose adjacent flag count equals its value reveals all remaining unflagged neighbors. Wrong flags cause a loss, faithful to the original.
-- Win: all non-mine cells revealed (flags irrelevant). Loss: reveal a mine — all mines exposed, incorrect flags marked.
+- Flag cycle on hidden cells: hidden → flagged → question mark → hidden. Flagged cells cannot be revealed; question-marked cells can (classic rule — only flags block reveals).
+- Chording: activating a revealed number whose adjacent flag count equals its value reveals all remaining unflagged neighbors (question-marked neighbors count as hidden and are revealed). Wrong flags cause a loss, faithful to the original.
+- Win: all non-mine cells revealed (flags irrelevant); remaining unflagged mines are auto-flagged in the display. Loss: reveal a mine — all mines exposed, incorrect flags marked.
 - Mine counter (mines − flags placed; may go negative), timer starting at first reveal (caps at 999), status face (playing/won/lost).
 - Persistent best times per preset (custom boards do not record times).
 
@@ -75,6 +75,7 @@ Game screen layout:
 ```
 
 - Cells render 2 chars wide. `░░` hidden, `·` revealed empty, `⚑` flag, `?` question, `✱` mine, cursor as bracket highlight.
+- Glyphs target modern macOS terminals (Unicode + emoji assumed; ⚑/░/✱ in the grid, 🚩/🙂/⏱ in the HUD). No ASCII fallback — out of scope.
 - Numbers in the classic Windows palette: 1 blue, 2 green, 3 red, 4 navy, 5 maroon, 6 teal, 7 white, 8 gray.
 - Keys: `hjkl`/arrows move; `space`/`enter` reveal (chord when on a revealed number); `f` flag cycle; `c` chord explicitly; `n` new game same settings; `m`/`esc` menu; `q`/`ctrl+c` quit; `?` help overlay.
 - Resize: on `WindowSizeMsg`, if the board doesn't fit, show "terminal too small (need W×H)" instead of clipping. Custom form validates against current terminal size.
