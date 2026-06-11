@@ -1,0 +1,186 @@
+package ui
+
+import (
+	"errors"
+	"fmt"
+	"math/rand"
+	"strconv"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/wallymagill/mines/internal/engine"
+	"github.com/wallymagill/mines/internal/store"
+)
+
+// startGameMsg is emitted by the menu and consumed by the root model.
+type startGameMsg struct{ preset Preset }
+
+func startGame(p Preset) tea.Cmd {
+	return func() tea.Msg { return startGameMsg{preset: p} }
+}
+
+const (
+	itemCustom = 3
+	itemQuit   = 4
+)
+
+type menuModel struct {
+	cursor int
+	scores store.Scores
+	form   *customForm
+	err    string
+	termW  int
+	termH  int
+}
+
+func newMenuModel(scores store.Scores, termW, termH int) menuModel {
+	return menuModel{scores: scores, termW: termW, termH: termH}
+}
+
+func (m menuModel) Update(msg tea.Msg) (menuModel, tea.Cmd) {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return m, nil
+	}
+	if m.form != nil {
+		return m.updateForm(keyMsg)
+	}
+	switch keyMsg.String() {
+	case "up", "k":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "down", "j":
+		if m.cursor < itemQuit {
+			m.cursor++
+		}
+	case "enter", " ":
+		switch {
+		case m.cursor < len(presets):
+			return m, startGame(presets[m.cursor])
+		case m.cursor == itemCustom:
+			f := newCustomForm()
+			m.form = &f
+			m.err = ""
+		default:
+			return m, tea.Quit
+		}
+	case "q", "esc":
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+type customForm struct {
+	fields [3]string // width, height, mines
+	active int
+}
+
+func newCustomForm() customForm { return customForm{} }
+
+func (m menuModel) updateForm(keyMsg tea.KeyMsg) (menuModel, tea.Cmd) {
+	switch keyMsg.String() {
+	case "esc":
+		m.form = nil
+		m.err = ""
+	case "tab", "down":
+		m.form.active = (m.form.active + 1) % 3
+	case "shift+tab", "up":
+		m.form.active = (m.form.active + 2) % 3
+	case "backspace":
+		if s := m.form.fields[m.form.active]; s != "" {
+			m.form.fields[m.form.active] = s[:len(s)-1]
+		}
+	case "enter":
+		if m.form.active < 2 {
+			m.form.active++
+			return m, nil
+		}
+		p, err := m.form.preset(m.termW, m.termH)
+		if err != nil {
+			m.err = err.Error()
+			return m, nil
+		}
+		m.form = nil
+		m.err = ""
+		return m, startGame(p)
+	default:
+		s := keyMsg.String()
+		if len(s) == 1 && s[0] >= '0' && s[0] <= '9' && len(m.form.fields[m.form.active]) < 3 {
+			m.form.fields[m.form.active] += s
+		}
+	}
+	return m, nil
+}
+
+// preset validates the form. Rule checks are delegated to engine.New (DRY);
+// the terminal-fit check is presentation-layer knowledge and lives here.
+func (f *customForm) preset(termW, termH int) (Preset, error) {
+	w, err1 := strconv.Atoi(f.fields[0])
+	h, err2 := strconv.Atoi(f.fields[1])
+	mines, err3 := strconv.Atoi(f.fields[2])
+	if err1 != nil || err2 != nil || err3 != nil {
+		return Preset{}, errors.New("all fields are required")
+	}
+	if _, err := engine.New(w, h, mines, rand.New(rand.NewSource(0))); err != nil {
+		return Preset{}, err
+	}
+	if termW > 0 && (w*2+2 > termW || h+boardChromeRows > termH) {
+		return Preset{}, fmt.Errorf("board too large for terminal (max %d×%d)",
+			(termW-2)/2, termH-boardChromeRows)
+	}
+	return Preset{Name: "Custom", Width: w, Height: h, Mines: mines}, nil
+}
+
+func (m menuModel) View() string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render(" MINES") + "\n\n")
+	if m.form != nil {
+		return b.String() + m.formView()
+	}
+	for i, p := range presets {
+		b.WriteString(m.menuRow(i, fmt.Sprintf("%-13s %d×%d · %d mines  best: %s",
+			p.Name, p.Width, p.Height, p.Mines, m.bestFor(p.Key))))
+	}
+	b.WriteString(m.menuRow(itemCustom, "Custom…"))
+	b.WriteString(m.menuRow(itemQuit, "Quit"))
+	b.WriteString("\n" + styleFaint.Render(" ↑↓ move · enter select"))
+	if m.err != "" {
+		b.WriteString("\n" + styleErr.Render(" "+m.err))
+	}
+	return b.String()
+}
+
+func (m menuModel) menuRow(i int, label string) string {
+	prefix := "   "
+	if m.cursor == i {
+		prefix = " > "
+		return styleHUD.Render(prefix+label) + "\n"
+	}
+	return prefix + label + "\n"
+}
+
+func (m menuModel) bestFor(key string) string {
+	if secs, ok := m.scores[key]; ok {
+		return fmt.Sprintf("%03d", secs)
+	}
+	return "—"
+}
+
+func (m menuModel) formView() string {
+	labels := []string{"width", "height", "mines"}
+	var b strings.Builder
+	b.WriteString(" Custom board\n\n")
+	for i, l := range labels {
+		cursor := " "
+		if m.form.active == i {
+			cursor = ">"
+		}
+		b.WriteString(fmt.Sprintf(" %s %-7s %s\n", cursor, l+":", m.form.fields[i]))
+	}
+	b.WriteString("\n" + styleFaint.Render(" tab/enter next · enter on mines starts · esc back"))
+	if m.err != "" {
+		b.WriteString("\n" + styleErr.Render(" "+m.err))
+	}
+	return b.String()
+}
