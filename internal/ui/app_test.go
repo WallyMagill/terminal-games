@@ -79,6 +79,20 @@ func TestAppMenuKeyReturnsToMenu(t *testing.T) {
 	}
 }
 
+// Spec key map binds both m and esc to "menu" from the game view; the
+// help-overlay test only covers esc while help is OPEN, so pin the
+// help-closed path separately.
+func TestAppEscReturnsToMenuFromGame(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(startGameMsg{preset: presets[0]})
+	a = model.(App)
+	model, _ = a.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	a = model.(App)
+	if a.view != viewMenu {
+		t.Error("esc in the game view (help closed) must return to the menu")
+	}
+}
+
 func TestAppCtrlCQuits(t *testing.T) {
 	a := testApp(t)
 	_, cmd := a.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
