@@ -19,18 +19,19 @@ func startGame(p Preset) tea.Cmd {
 	return func() tea.Msg { return startGameMsg{preset: p} }
 }
 
-const (
-	itemCustom = 3
-	itemQuit   = 4
+var (
+	itemCustom = len(presets)
+	itemQuit   = itemCustom + 1
 )
 
 type menuModel struct {
-	cursor int
-	scores store.Scores
-	form   *customForm
-	err    string
-	termW  int
-	termH  int
+	cursor   int
+	scores   store.Scores
+	form     customForm
+	showForm bool
+	err      string
+	termW    int
+	termH    int
 }
 
 func newMenuModel(scores store.Scores, termW, termH int) menuModel {
@@ -42,7 +43,7 @@ func (m menuModel) Update(msg tea.Msg) (menuModel, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	if m.form != nil {
+	if m.showForm {
 		return m.updateForm(keyMsg)
 	}
 	switch keyMsg.String() {
@@ -59,8 +60,8 @@ func (m menuModel) Update(msg tea.Msg) (menuModel, tea.Cmd) {
 		case m.cursor < len(presets):
 			return m, startGame(presets[m.cursor])
 		case m.cursor == itemCustom:
-			f := newCustomForm()
-			m.form = &f
+			m.form = newCustomForm()
+			m.showForm = true
 			m.err = ""
 		default:
 			return m, tea.Quit
@@ -81,7 +82,7 @@ func newCustomForm() customForm { return customForm{} }
 func (m menuModel) updateForm(keyMsg tea.KeyMsg) (menuModel, tea.Cmd) {
 	switch keyMsg.String() {
 	case "esc":
-		m.form = nil
+		m.showForm = false
 		m.err = ""
 	case "tab", "down":
 		m.form.active = (m.form.active + 1) % 3
@@ -91,6 +92,7 @@ func (m menuModel) updateForm(keyMsg tea.KeyMsg) (menuModel, tea.Cmd) {
 		if s := m.form.fields[m.form.active]; s != "" {
 			m.form.fields[m.form.active] = s[:len(s)-1]
 		}
+		m.err = ""
 	case "enter":
 		if m.form.active < 2 {
 			m.form.active++
@@ -101,13 +103,14 @@ func (m menuModel) updateForm(keyMsg tea.KeyMsg) (menuModel, tea.Cmd) {
 			m.err = err.Error()
 			return m, nil
 		}
-		m.form = nil
+		m.showForm = false
 		m.err = ""
 		return m, startGame(p)
 	default:
 		s := keyMsg.String()
 		if len(s) == 1 && s[0] >= '0' && s[0] <= '9' && len(m.form.fields[m.form.active]) < 3 {
 			m.form.fields[m.form.active] += s
+			m.err = ""
 		}
 	}
 	return m, nil
@@ -115,7 +118,7 @@ func (m menuModel) updateForm(keyMsg tea.KeyMsg) (menuModel, tea.Cmd) {
 
 // preset validates the form. Rule checks are delegated to engine.New (DRY);
 // the terminal-fit check is presentation-layer knowledge and lives here.
-func (f *customForm) preset(termW, termH int) (Preset, error) {
+func (f customForm) preset(termW, termH int) (Preset, error) {
 	w, err1 := strconv.Atoi(f.fields[0])
 	h, err2 := strconv.Atoi(f.fields[1])
 	mines, err3 := strconv.Atoi(f.fields[2])
@@ -125,9 +128,9 @@ func (f *customForm) preset(termW, termH int) (Preset, error) {
 	if _, err := engine.New(w, h, mines, rand.New(rand.NewSource(0))); err != nil {
 		return Preset{}, err
 	}
-	if termW > 0 && (w*2+2 > termW || h+boardChromeRows > termH) {
+	if termW > 0 && termH > 0 && (w*2+2 > termW || h+boardChromeRows > termH) {
 		return Preset{}, fmt.Errorf("board too large for terminal (max %d×%d)",
-			(termW-2)/2, termH-boardChromeRows)
+			max((termW-2)/2, 0), max(termH-boardChromeRows, 0))
 	}
 	return Preset{Name: "Custom", Width: w, Height: h, Mines: mines}, nil
 }
@@ -135,7 +138,7 @@ func (f *customForm) preset(termW, termH int) (Preset, error) {
 func (m menuModel) View() string {
 	var b strings.Builder
 	b.WriteString(styleTitle.Render(" MINES") + "\n\n")
-	if m.form != nil {
+	if m.showForm {
 		return b.String() + m.formView()
 	}
 	for i, p := range presets {

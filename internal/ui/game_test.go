@@ -35,6 +35,8 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyLeft}
 	case "right":
 		return tea.KeyMsg{Type: tea.KeyRight}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }

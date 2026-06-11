@@ -66,7 +66,7 @@ func TestCustomFormFlow(t *testing.T) {
 		m, _ = m.Update(key("j")) // Custom
 	}
 	m, _ = m.Update(key("enter"))
-	if m.form == nil {
+	if !m.showForm {
 		t.Fatal("enter on Custom should open the form")
 	}
 	// Type width 12, height 8, mines 20.
@@ -111,7 +111,7 @@ func TestCustomFormValidation(t *testing.T) {
 			if m.err == "" || !strings.Contains(m.err, tt.wantErr) {
 				t.Errorf("err = %q, want containing %q", m.err, tt.wantErr)
 			}
-			if m.form == nil {
+			if !m.showForm {
 				t.Error("form should stay open on validation error")
 			}
 		})
@@ -125,8 +125,64 @@ func TestCustomFormEscReturnsToList(t *testing.T) {
 	}
 	m, _ = m.Update(key("enter"))
 	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	if m.form != nil {
+	if m.showForm {
 		t.Error("esc should close the form")
+	}
+}
+
+func openForm(t *testing.T, m menuModel) menuModel {
+	t.Helper()
+	for i := 0; i < 3; i++ {
+		m, _ = m.Update(key("j"))
+	}
+	m, _ = m.Update(key("enter"))
+	if !m.showForm {
+		t.Fatal("form should be open")
+	}
+	return m
+}
+
+func TestCustomFormEditing(t *testing.T) {
+	m := openForm(t, testMenu())
+	// tab wraps 0→1→2→0; shift+tab wraps back 0→2
+	for i, want := range []int{1, 2, 0} {
+		m, _ = m.Update(key("tab"))
+		if m.form.active != want {
+			t.Fatalf("tab step %d: active = %d, want %d", i, m.form.active, want)
+		}
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	if m.form.active != 2 {
+		t.Errorf("shift+tab from 0: active = %d, want 2", m.form.active)
+	}
+	// backspace on empty field is a no-op
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.form.fields[2] != "" {
+		t.Errorf("backspace on empty = %q, want empty", m.form.fields[2])
+	}
+	// digits append with leading zeros preserved, capped at 3
+	for _, d := range []string{"0", "1", "2", "9"} {
+		m, _ = m.Update(key(d))
+	}
+	if m.form.fields[2] != "012" {
+		t.Errorf("field = %q, want \"012\" (3-char cap, leading zero kept)", m.form.fields[2])
+	}
+	// editing clears a stale error
+	m.err = "stale"
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.err != "" {
+		t.Error("backspace should clear stale validation error")
+	}
+}
+
+func TestFormViewRendersFieldsAndCursor(t *testing.T) {
+	m := openForm(t, testMenu())
+	m, _ = m.Update(key("9"))
+	v := m.View()
+	for _, want := range []string{"Custom board", "width", "height", "mines", ">", "9", "esc back"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("form view missing %q:\n%s", want, v)
+		}
 	}
 }
 
