@@ -6,6 +6,7 @@ import (
 	"math/rand"
 )
 
+// CellState is the player-visible state of a single cell.
 type CellState uint8
 
 const (
@@ -15,6 +16,7 @@ const (
 	Revealed
 )
 
+// Status is the lifecycle state of a Game.
 type Status uint8
 
 const (
@@ -24,15 +26,18 @@ const (
 	Lost
 )
 
+// Cell is a read-only snapshot of one board cell.
 type Cell struct {
 	Mine     bool
 	State    CellState
 	Adjacent int
 }
 
+// Constructor validation errors.
 var (
 	ErrBoardTooSmall = errors.New("board must be at least 2x2")
 	ErrMineCount     = errors.New("mines must be between 1 and width*height-2")
+	ErrNilRNG        = errors.New("rng must not be nil")
 )
 
 // Game is a single minesweeper round. Mines are placed lazily on the first
@@ -52,7 +57,13 @@ type Game struct {
 	mineHit    bool
 }
 
+// New creates an unstarted game. Mines are not placed until the first
+// Reveal so the first click is never a mine. rng drives mine placement
+// and must not be nil.
 func New(width, height, mines int, rng *rand.Rand) (*Game, error) {
+	if rng == nil {
+		return nil, ErrNilRNG
+	}
 	if width < 2 || height < 2 {
 		return nil, ErrBoardTooSmall
 	}

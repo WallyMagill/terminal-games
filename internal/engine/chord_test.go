@@ -10,12 +10,21 @@ func TestChordWithCorrectFlagsRevealsNeighbors(t *testing.T) {
 	if !g.Chord(1, 1) {
 		t.Fatal("chord with matching flags should change the board")
 	}
-	// All unflagged neighbors of (1,1) open; (0,1) and (1,0) are numbers,
-	// (2,0)/(2,1)/(0,2)/(1,2) too — none are zero... except (2,0) and (0,2)
-	// ARE zero cells, so they cascade into their zero regions.
-	for _, p := range [][2]int{{0, 1}, {1, 0}, {2, 0}, {2, 1}, {0, 2}, {1, 2}} {
+	// All unflagged neighbors of (1,1) open. (2,0) and (0,2) are zero cells,
+	// so the chord cascades through their zero regions too.
+	wantRevealed := [][2]int{
+		{0, 1}, {1, 0}, {2, 0}, {2, 1}, {0, 2}, {1, 2}, // direct neighbors
+		{3, 0}, {3, 1}, {0, 3}, {1, 3}, // cascade via the zero cells
+	}
+	for _, p := range wantRevealed {
 		if got := stateAt(t, g, p[0], p[1]); got != Revealed {
 			t.Errorf("(%d,%d) state = %v, want Revealed", p[0], p[1], got)
+		}
+	}
+	// The cascade must not cross the numbered border around the (2,2) mine.
+	for _, p := range [][2]int{{2, 3}, {3, 2}, {3, 3}} {
+		if got := stateAt(t, g, p[0], p[1]); got != Hidden {
+			t.Errorf("(%d,%d) state = %v, want Hidden", p[0], p[1], got)
 		}
 	}
 	if g.Status() == Lost {

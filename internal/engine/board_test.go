@@ -13,20 +13,26 @@ func TestNewValidation(t *testing.T) {
 		name    string
 		w, h    int
 		mines   int
+		nilRNG  bool
 		wantErr error
 	}{
-		{"valid beginner", 9, 9, 10, nil},
-		{"valid minimum board", 2, 2, 1, nil},
-		{"valid max mines", 4, 4, 14, nil},
-		{"width too small", 1, 5, 1, ErrBoardTooSmall},
-		{"height too small", 5, 1, 1, ErrBoardTooSmall},
-		{"zero mines", 4, 4, 0, ErrMineCount},
-		{"negative mines", 4, 4, -1, ErrMineCount},
-		{"too many mines", 4, 4, 15, ErrMineCount},
+		{"valid beginner", 9, 9, 10, false, nil},
+		{"valid minimum board", 2, 2, 1, false, nil},
+		{"valid max mines", 4, 4, 14, false, nil},
+		{"width too small", 1, 5, 1, false, ErrBoardTooSmall},
+		{"height too small", 5, 1, 1, false, ErrBoardTooSmall},
+		{"zero mines", 4, 4, 0, false, ErrMineCount},
+		{"negative mines", 4, 4, -1, false, ErrMineCount},
+		{"too many mines", 4, 4, 15, false, ErrMineCount},
+		{"nil rng", 9, 9, 10, true, ErrNilRNG},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g, err := New(tt.w, tt.h, tt.mines, testRNG())
+			rng := testRNG()
+			if tt.nilRNG {
+				rng = nil
+			}
+			g, err := New(tt.w, tt.h, tt.mines, rng)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("New(%d,%d,%d) error = %v, want %v", tt.w, tt.h, tt.mines, err, tt.wantErr)
 			}
