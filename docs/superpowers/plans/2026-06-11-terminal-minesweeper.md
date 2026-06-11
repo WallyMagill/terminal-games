@@ -2422,6 +2422,13 @@ git commit -m "feat: menu with presets, best times, validated custom form"
 > `itemQuit` are derived from `len(presets)`; editing clears stale validation
 > errors; the fit check requires both terminal dims and clamps printed maxes.
 
+> **Execution amendment (audit-driven):** the preset row format pinned above
+> padded only the name (`%-13s`), leaving the dims segment ragged — Beginner's
+> `9×9` is two columns narrower than `16×16`/`30×16`, so its `best:` field
+> started two columns early. The dims are now formatted separately and padded
+> to the widest preset (`%-5s`; `×` is a single rune and column), aligning the
+> `best:` column across all rows with or without recorded times.
+
 ---
 
 ### Task 14: App root model and main wiring

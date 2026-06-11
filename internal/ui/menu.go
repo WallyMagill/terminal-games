@@ -146,8 +146,11 @@ func (m menuModel) View() string {
 		return b.String() + m.formView()
 	}
 	for i, p := range presets {
-		b.WriteString(m.menuRow(i, fmt.Sprintf("%-13s %d×%d · %d mines  best: %s",
-			p.Name, p.Width, p.Height, p.Mines, m.bestFor(p.Key))))
+		// Dims are padded to the widest preset ("30×16", 5 cols; × is one
+		// rune and one column) so the best: column lines up across rows.
+		dims := fmt.Sprintf("%d×%d", p.Width, p.Height)
+		b.WriteString(m.menuRow(i, fmt.Sprintf("%-13s %-5s · %d mines  best: %s",
+			p.Name, dims, p.Mines, m.bestFor(p.Key))))
 	}
 	b.WriteString(m.menuRow(itemCustom, "Custom…"))
 	b.WriteString(m.menuRow(itemQuit, "Quit"))

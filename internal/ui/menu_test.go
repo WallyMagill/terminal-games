@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/wallymagill/mines/internal/store"
 )
@@ -210,5 +212,30 @@ func TestMenuViewShowsBestTimes(t *testing.T) {
 	}
 	if !strings.Contains(v, "—") {
 		t.Error("menu should show an em dash for missing best times")
+	}
+}
+
+// The "best:" fields of all preset rows must start at the same display
+// column, whatever times are recorded: the dims segment is padded so the
+// narrow 9×9 row lines up with 16×16 and 30×16.
+func TestMenuBestColumnAligned(t *testing.T) {
+	for _, scores := range []store.Scores{{}, {"beginner": 42, "intermediate": 187}} {
+		m := newMenuModel(scores, 120, 40)
+		var cols []int
+		for _, line := range strings.Split(m.View(), "\n") {
+			if idx := strings.Index(line, "best:"); idx >= 0 {
+				cols = append(cols, lipgloss.Width(line[:idx]))
+			}
+		}
+		if len(cols) != len(presets) {
+			t.Fatalf("scores %v: found %d rows with best:, want %d\n%s",
+				scores, len(cols), len(presets), m.View())
+		}
+		for i, c := range cols[1:] {
+			if c != cols[0] {
+				t.Errorf("scores %v: best: column ragged: row 0 starts it at col %d, row %d at col %d\n%s",
+					scores, cols[0], i+1, c, m.View())
+			}
+		}
 	}
 }
