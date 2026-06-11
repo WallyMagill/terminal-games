@@ -1,7 +1,23 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/mines/internal/ui"
+)
 
 func main() {
-	fmt.Println("mines: TUI wiring lands in Task 14")
+	path, err := store.DefaultPath()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mines: cannot determine config dir:", err)
+		os.Exit(1)
+	}
+	app := ui.NewApp(store.New(path))
+	if _, err := tea.NewProgram(app, tea.WithAltScreen()).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, "mines:", err)
+		os.Exit(1)
+	}
 }
