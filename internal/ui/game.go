@@ -162,8 +162,13 @@ func (m gameModel) hudView() string {
 	case engine.Lost:
 		face = "💀"
 	}
+	// The displayed counter clamps at -99 (classic minesweeper): %03d grows
+	// to four characters at -100, shifting the face and timer mid-game. The
+	// real count keeps going below; only the display saturates. The positive
+	// side never overflows: presets and the 3-digit custom form cap mines at
+	// 999.
 	return styleHUD.Render(fmt.Sprintf(" 🚩 %03d   %s   ⏱ %03d",
-		m.game.MinesRemaining(), face, m.elapsed))
+		max(m.game.MinesRemaining(), -99), face, m.elapsed))
 }
 
 func (m gameModel) boardView() string {

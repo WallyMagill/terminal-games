@@ -2039,6 +2039,14 @@ git add internal/ui/
 git commit -m "feat: game view with HUD, board glyphs, status line, help overlay"
 ```
 
+> **Execution amendment (audit-driven):** the HUD's mine counter clamps its
+> *display* at -99, classic-minesweeper style — `%03d` emits four characters
+> at -100 and below (reachable by mass flagging on Intermediate/Expert),
+> widening the HUD by one column and shifting the face and timer mid-game.
+> `MinesRemaining()` itself still goes as negative as flags allow; only the
+> rendered field saturates. The positive side needs no clamp: presets and
+> the three-digit custom form cap mines at 999, which `%03d` shows whole.
+
 ---
 
 ### Task 13: Menu model and custom board form

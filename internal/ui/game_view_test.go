@@ -213,3 +213,55 @@ func TestHelpOverlayLinesFitChromeCols(t *testing.T) {
 		}
 	}
 }
+
+// The HUD must keep a constant width as the mine counter moves through its
+// full range, or the face and timer shift mid-game. The displayed counter
+// clamps at -99 (classic minesweeper) so the three-character field never
+// grows, even though the real count keeps going below.
+func TestHUDWidthStableAcrossCounterValues(t *testing.T) {
+	s := store.New(t.TempDir() + "/scores.json")
+	m, err := newGameModel(Preset{Name: "Dense", Width: 40, Height: 40, Mines: 999},
+		s, rand.New(rand.NewSource(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// flagTo flags distinct hidden cells until the counter reads target.
+	next := 0
+	flagTo := func(target int) {
+		t.Helper()
+		for m.game.MinesRemaining() > target {
+			if next >= 40*40 {
+				t.Fatalf("ran out of cells flagging down to %d", target)
+			}
+			m.game.CycleFlag(next%40, next/40)
+			next++
+		}
+	}
+	baseW := lipgloss.Width(m.hudView()) // counter 999, the widest positive
+	tests := []struct {
+		counter int
+		want    string
+	}{
+		{999, "🚩 999"},
+		{42, "🚩 042"},
+		{7, "🚩 007"},
+		{0, "🚩 000"},
+		{-5, "🚩 -05"},
+		{-99, "🚩 -99"},
+		{-100, "🚩 -99"}, // display clamps; MinesRemaining itself is -100
+	}
+	for _, tt := range tests {
+		flagTo(tt.counter)
+		hud := m.hudView()
+		if w := lipgloss.Width(hud); w != baseW {
+			t.Errorf("counter %d: HUD %q is %d cols, want %d (face/timer shift)",
+				tt.counter, hud, w, baseW)
+		}
+		if !strings.Contains(hud, tt.want) {
+			t.Errorf("counter %d: HUD %q missing %q", tt.counter, hud, tt.want)
+		}
+	}
+	if got := m.game.MinesRemaining(); got != -100 {
+		t.Fatalf("MinesRemaining = %d, want -100 (clamp must be display-only)", got)
+	}
+}
