@@ -3,19 +3,18 @@ package ui
 import (
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/wallymagill/mines/internal/store"
 )
 
 func TestTickIncrementsOnlyWhilePlaying(t *testing.T) {
 	m := testGameModel(t)
-	m, _ = m.Update(tickMsg(time.Time{})) // before first reveal: no-op
+	m, _ = m.Update(tickMsg{}) // before first reveal: no-op
 	if m.elapsed != 0 {
 		t.Errorf("elapsed before start = %d, want 0", m.elapsed)
 	}
 	m, _ = m.Update(key(" ")) // start
-	m, cmd := m.Update(tickMsg(time.Time{}))
+	m, cmd := m.Update(tickMsg{})
 	if m.elapsed != 1 {
 		t.Errorf("elapsed after one tick = %d, want 1", m.elapsed)
 	}
@@ -28,9 +27,28 @@ func TestTimerCapsAt999(t *testing.T) {
 	m := testGameModel(t)
 	m, _ = m.Update(key(" "))
 	m.elapsed = 999
-	m, _ = m.Update(tickMsg(time.Time{}))
+	m, _ = m.Update(tickMsg{})
 	if m.elapsed != 999 {
 		t.Errorf("elapsed = %d, want capped at 999", m.elapsed)
+	}
+}
+
+func TestStaleTickFromPreviousRoundIsIgnored(t *testing.T) {
+	m := testGameModel(t)
+	m, _ = m.Update(key(" ")) // start round 1; tick T1 in flight
+	staleGen := m.tickGen
+	m, _ = m.Update(key("n"))                  // restart
+	m, _ = m.Update(key(" "))                  // start round 2; tick T2 in flight
+	m, cmd := m.Update(tickMsg{gen: staleGen}) // T1 lands late
+	if m.elapsed != 0 {
+		t.Errorf("stale tick incremented elapsed to %d, want 0", m.elapsed)
+	}
+	if cmd != nil {
+		t.Error("stale tick must not reschedule (would create a second tick loop)")
+	}
+	m, cmd = m.Update(tickMsg{gen: m.tickGen}) // T2 lands
+	if m.elapsed != 1 || cmd == nil {
+		t.Errorf("current-generation tick: elapsed = %d (want 1), cmd nil = %v (want false)", m.elapsed, cmd == nil)
 	}
 }
 

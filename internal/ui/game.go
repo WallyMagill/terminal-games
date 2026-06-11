@@ -9,10 +9,10 @@ import (
 	"github.com/wallymagill/mines/internal/store"
 )
 
-type tickMsg time.Time
+type tickMsg struct{ gen int }
 
-func tickCmd() tea.Cmd {
-	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickMsg(t) })
+func tickCmd(gen int) tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg { return tickMsg{gen: gen} })
 }
 
 type gameModel struct {
@@ -23,6 +23,7 @@ type gameModel struct {
 	cursorX  int
 	cursorY  int
 	elapsed  int
+	tickGen  int
 	running  bool
 	recorded bool
 	newBest  bool
@@ -41,11 +42,14 @@ func newGameModel(p Preset, scores *store.Store, rng *rand.Rand) (gameModel, err
 func (m gameModel) Update(msg tea.Msg) (gameModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
+		if msg.gen != m.tickGen {
+			return m, nil // stale tick loop from a previous round dies here
+		}
 		if m.running && m.game.Status() == engine.Playing {
 			if m.elapsed < 999 {
 				m.elapsed++
 			}
-			return m, tickCmd()
+			return m, tickCmd(m.tickGen)
 		}
 		m.running = false
 		return m, nil
@@ -88,6 +92,7 @@ func (m gameModel) handleKey(k string) (gameModel, tea.Cmd) {
 		if err != nil {
 			return m, nil // preset was already valid; keep current game
 		}
+		fresh.tickGen = m.tickGen + 1 // invalidate any in-flight tick
 		return fresh, nil
 	case "?":
 		m.showHelp = true
@@ -110,9 +115,9 @@ func (m gameModel) activate(chordOnly bool) (gameModel, tea.Cmd) {
 		m.game.Reveal(m.cursorX, m.cursorY)
 	}
 	var cmd tea.Cmd
-	if wasNotStarted && m.game.Status() != engine.NotStarted && !m.running {
+	if wasNotStarted && m.game.Status() == engine.Playing && !m.running {
 		m.running = true
-		cmd = tickCmd()
+		cmd = tickCmd(m.tickGen)
 	}
 	m = m.recordIfWon()
 	return m, cmd
@@ -125,6 +130,8 @@ func (m gameModel) recordIfWon() gameModel {
 	m.recorded = true
 	isBest, err := m.scores.RecordIfBest(m.preset.Key, m.elapsed)
 	if err != nil {
+		// Deliberate: an unsaved record is not celebrated as a new best; the
+		// HUD shows the save warning instead.
 		m.saveErr = true
 		return m
 	}

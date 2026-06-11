@@ -22,11 +22,19 @@ func testGameModel(t *testing.T) gameModel {
 }
 
 func key(s string) tea.KeyMsg {
-	if s == " " {
+	switch s {
+	case " ":
 		return tea.KeyMsg{Type: tea.KeySpace}
-	}
-	if s == "enter" {
+	case "enter":
 		return tea.KeyMsg{Type: tea.KeyEnter}
+	case "up":
+		return tea.KeyMsg{Type: tea.KeyUp}
+	case "down":
+		return tea.KeyMsg{Type: tea.KeyDown}
+	case "left":
+		return tea.KeyMsg{Type: tea.KeyLeft}
+	case "right":
+		return tea.KeyMsg{Type: tea.KeyRight}
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }
@@ -41,6 +49,8 @@ func TestCursorMovementClamps(t *testing.T) {
 		{"starts at origin, h/k clamp", []string{"h", "k"}, 0, 0},
 		{"l and j move", []string{"l", "l", "j"}, 2, 1},
 		{"clamps at right/bottom edge", []string{"l", "l", "l", "l", "l", "j", "j", "j", "j"}, 3, 3},
+		{"moves back up and left", []string{"l", "l", "j", "j", "k", "h"}, 1, 1},
+		{"arrow keys move too", []string{"right", "down"}, 1, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -67,6 +77,68 @@ func TestSpaceRevealsAndStartsGame(t *testing.T) {
 	}
 	if !m.running || cmd == nil {
 		t.Error("first reveal must start the timer (running=true, tick cmd returned)")
+	}
+}
+
+func TestSpaceOnRevealedNumberChords(t *testing.T) {
+	m := testGameModel(t)
+	m, _ = m.Update(key(" ")) // first reveal places mines and opens (0,0) area
+	// Find a revealed numbered cell with at least one hidden neighbor, flag
+	// its mines, then chord it via space and verify neighbors opened.
+	g := m.game
+	for y := 0; y < g.Height(); y++ {
+		for x := 0; x < g.Width(); x++ {
+			c, _ := g.CellAt(x, y)
+			if c.State != engine.Revealed || c.Adjacent == 0 {
+				continue
+			}
+			// flag all mine neighbors
+			for dy := -1; dy <= 1; dy++ {
+				for dx := -1; dx <= 1; dx++ {
+					nx, ny := x+dx, y+dy
+					if n, ok := g.CellAt(nx, ny); ok && n.Mine && n.State == engine.Hidden {
+						m.cursorX, m.cursorY = nx, ny
+						m, _ = m.Update(key("f"))
+					}
+				}
+			}
+			// count hidden non-flagged neighbors before chording
+			hiddenBefore := 0
+			for dy := -1; dy <= 1; dy++ {
+				for dx := -1; dx <= 1; dx++ {
+					if n, ok := g.CellAt(x+dx, y+dy); ok && n.State == engine.Hidden {
+						hiddenBefore++
+					}
+				}
+			}
+			if hiddenBefore == 0 {
+				continue
+			}
+			m.cursorX, m.cursorY = x, y
+			m, _ = m.Update(key(" ")) // space on revealed number must chord
+			hiddenAfter := 0
+			for dy := -1; dy <= 1; dy++ {
+				for dx := -1; dx <= 1; dx++ {
+					if n, ok := g.CellAt(x+dx, y+dy); ok && n.State == engine.Hidden {
+						hiddenAfter++
+					}
+				}
+			}
+			if hiddenAfter >= hiddenBefore {
+				t.Errorf("space on revealed (%d,%d) did not chord: hidden %d -> %d", x, y, hiddenBefore, hiddenAfter)
+			}
+			return
+		}
+	}
+	t.Skip("seed produced no chordable cell; adjust seed if this ever happens")
+}
+
+func TestCKeyOnHiddenCellDoesNotReveal(t *testing.T) {
+	m := testGameModel(t)
+	m, _ = m.Update(key("c"))
+	c, _ := m.game.CellAt(0, 0)
+	if c.State != engine.Hidden {
+		t.Errorf("c on hidden cell changed state to %v, want Hidden", c.State)
 	}
 }
 
