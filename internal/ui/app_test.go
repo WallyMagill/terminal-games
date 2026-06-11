@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,6 +11,36 @@ import (
 	"github.com/wallymagill/mines/internal/engine"
 	"github.com/wallymagill/mines/internal/store"
 )
+
+// winTiny drives a 2×2/1 game under presetKey to a win, routing every
+// keystroke through App.Update so the real win path (timer, record, HUD
+// state) is exercised end to end.
+func winTiny(t *testing.T, a App, presetKey string) App {
+	t.Helper()
+	tiny := Preset{Name: "Tiny", Key: presetKey, Width: 2, Height: 2, Mines: 1}
+	model, _ := a.Update(startGameMsg{preset: tiny})
+	a = model.(App)
+	// First reveal at (0,0): first-click safety places the mine elsewhere.
+	model, _ = a.Update(key(" "))
+	a = model.(App)
+	// Reveal the remaining safe cells, steering the cursor directly but
+	// routing every reveal keystroke through App.Update.
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			cell, _ := a.game.game.CellAt(x, y)
+			if cell.Mine || cell.State == engine.Revealed {
+				continue
+			}
+			a.game.cursorX, a.game.cursorY = x, y
+			model, _ = a.Update(key(" "))
+			a = model.(App)
+		}
+	}
+	if a.game.game.Status() != engine.Won {
+		t.Fatalf("status = %v, want Won", a.game.game.Status())
+	}
+	return a
+}
 
 func testApp(t *testing.T) App {
 	t.Helper()
@@ -207,33 +239,36 @@ func TestAppQKeyQuitsFromGame(t *testing.T) {
 }
 
 func TestAppWinShowsBestTimeOnMenu(t *testing.T) {
-	a := testApp(t)
-	tiny := Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}
-	model, _ := a.Update(startGameMsg{preset: tiny})
-	a = model.(App)
-	// First reveal at (0,0): first-click safety places the mine elsewhere.
-	model, _ = a.Update(key(" "))
-	a = model.(App)
-	// Reveal the remaining safe cells, steering the cursor directly but
-	// routing every reveal keystroke through App.Update.
-	for y := 0; y < 2; y++ {
-		for x := 0; x < 2; x++ {
-			cell, _ := a.game.game.CellAt(x, y)
-			if cell.Mine || cell.State == engine.Revealed {
-				continue
-			}
-			a.game.cursorX, a.game.cursorY = x, y
-			model, _ = a.Update(key(" "))
-			a = model.(App)
-		}
-	}
-	if a.game.game.Status() != engine.Won {
-		t.Fatalf("status = %v, want Won", a.game.game.Status())
-	}
-	model, _ = a.Update(key("m"))
+	a := winTiny(t, testApp(t), "beginner")
+	model, _ := a.Update(key("m"))
 	a = model.(App)
 	if !strings.Contains(a.View(), "best: 000") {
 		t.Errorf("menu should show the new beginner best 000:\n%s", a.View())
+	}
+}
+
+// A real persistence failure on the win path must set the HUD warning and
+// must not celebrate NEW BEST: the spec requires "save failure shows a
+// one-line HUD warning", and an unsaved record is not a record.
+func TestSaveFailureShowsHUDWarning(t *testing.T) {
+	// Block the store path with a regular file where a directory is needed
+	// so RecordIfBest fails for real — no injection, just the filesystem.
+	blocker := filepath.Join(t.TempDir(), "mines")
+	if err := os.WriteFile(blocker, []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := NewApp(store.New(filepath.Join(blocker, "scores.json")))
+	model, _ := a.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	a = winTiny(t, model.(App), "beginner")
+
+	if !a.game.saveErr {
+		t.Error("saveErr not set after a real save failure")
+	}
+	if a.game.newBest {
+		t.Error("an unsaved record must not be celebrated as NEW BEST")
+	}
+	if v := a.View(); !strings.Contains(v, "could not save score") {
+		t.Errorf("win view missing save warning:\n%s", v)
 	}
 }
 
