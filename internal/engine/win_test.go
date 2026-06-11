@@ -59,6 +59,27 @@ func TestActionsAfterWinAreNoOps(t *testing.T) {
 	}
 }
 
+// Audit finding: TestActionsAfterWinAreNoOps flags a REVEALED cell, which
+// the state switch rejects regardless of the Won guard. The guard is only
+// observable on an auto-flagged mine — without it, one keypress flips the
+// flag to Questioned and pushes the finished board's counter to 1.
+func TestFlagAfterWinIsNoOp(t *testing.T) {
+	g := newWithMines(t, 3, 3, [][2]int{{0, 0}})
+	g.Reveal(2, 2) // flood → win, (0,0) auto-flagged
+	if g.Status() != Won {
+		t.Fatal("setup: expected Won")
+	}
+	if g.CycleFlag(0, 0) {
+		t.Fatal("CycleFlag after win must be a no-op")
+	}
+	if got := stateAt(t, g, 0, 0); got != Flagged {
+		t.Errorf("auto-flagged mine state = %v, want Flagged", got)
+	}
+	if g.MinesRemaining() != 0 {
+		t.Errorf("MinesRemaining = %d, want 0", g.MinesRemaining())
+	}
+}
+
 func TestWinViaChord(t *testing.T) {
 	// Review finding: every other win test wins via Reveal; a dropped
 	// checkWin() inside Chord would regress silently without this.

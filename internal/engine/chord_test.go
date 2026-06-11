@@ -61,6 +61,67 @@ func TestChordWithWrongFlagLoses(t *testing.T) {
 	}
 }
 
+// Audit finding: a losing chord stops at the FIRST mine hit; cells after it
+// in neighbor order stay untouched and HitMine reports the first mine, not
+// the last. Pins the mid-chord stop-on-loss.
+func TestChordStopsAtFirstMineHit(t *testing.T) {
+	g := cornerBoard(t)
+	g.Reveal(1, 1)    // the "2"
+	g.CycleFlag(1, 0) // two wrong flags
+	g.CycleFlag(0, 2)
+	g.Chord(1, 1) // first neighbor (0,0) is a mine → Lost immediately
+	if g.Status() != Lost {
+		t.Fatal("setup: expected Lost")
+	}
+	if x, y, ok := g.HitMine(); !ok || x != 0 || y != 0 {
+		t.Errorf("HitMine = (%d,%d,%v), want (0,0,true) — first mine hit", x, y, ok)
+	}
+	// (2,0) follows the mine in neighbor order and would flood-cascade if
+	// the chord kept going; (2,2) is the second mine.
+	if got := stateAt(t, g, 2, 0); got != Hidden {
+		t.Errorf("(2,0) state = %v, want Hidden (chord must stop at first mine)", got)
+	}
+	if got := stateAt(t, g, 2, 2); got != Hidden {
+		t.Errorf("second mine (2,2) state = %v, want Hidden", got)
+	}
+}
+
+// Pins the post-loss freeze for Chord. Dropping only the entry Lost guard
+// is equivalent at HEAD — the mid-chord stop neutralizes every iteration —
+// but this test pins the pair contract so the entry guard and the mid-chord
+// stop cannot both regress silently.
+func TestChordAfterLossOnChordableNumberIsNoOp(t *testing.T) {
+	g := cornerBoard(t)
+	g.Reveal(1, 1)    // the "2"
+	g.CycleFlag(0, 0) // correct flag
+	g.CycleFlag(2, 1) // wrong flag on safe cell — count matches the "2"
+	g.Reveal(2, 2)    // hit the unflagged mine: Lost
+	if g.Status() != Lost {
+		t.Fatal("setup: expected Lost")
+	}
+	if g.Chord(1, 1) {
+		t.Fatal("chord after loss must be a no-op")
+	}
+	if got := stateAt(t, g, 1, 0); got != Hidden {
+		t.Errorf("(1,0) state = %v, want Hidden (board must not mutate after loss)", got)
+	}
+}
+
+// Audit finding: the changed-result contract. A chord whose neighbors are
+// all flagged or already revealed changes nothing and must return false.
+func TestChordWithNothingLeftToRevealReturnsFalse(t *testing.T) {
+	g := cornerBoard(t)
+	g.Reveal(1, 1)
+	g.CycleFlag(0, 0)
+	g.CycleFlag(2, 2)
+	if !g.Chord(1, 1) {
+		t.Fatal("first chord should change the board")
+	}
+	if g.Chord(1, 1) {
+		t.Error("second chord changes nothing and must return false")
+	}
+}
+
 // Audit finding: chording fires only when the flag count EQUALS the number.
 // Excess flags must be a no-op just like insufficient flags — a relaxed >=
 // guard would open the unflagged mine when one of three flags is wrong.

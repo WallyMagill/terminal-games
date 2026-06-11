@@ -101,6 +101,38 @@ func TestRevealMineLoses(t *testing.T) {
 	}
 }
 
+// Audit finding: the changed-result contract — revealing a mine mutates the
+// board to Lost and must return true like any other board change.
+func TestRevealMineReturnsTrue(t *testing.T) {
+	g := cornerBoard(t)
+	if !g.Reveal(0, 0) {
+		t.Error("revealing a mine changes the board and must return true")
+	}
+}
+
+// Audit finding: the committed loss tests use the symmetric coordinate
+// (0,0) or check only the ok flag, so transposed hit coordinates in Reveal,
+// Chord, and the HitMine accessor all survived. An asymmetric mine position
+// pins all three sites.
+func TestHitMineCoordinatesNotTransposed(t *testing.T) {
+	g := newWithMines(t, 4, 4, [][2]int{{2, 1}})
+	g.Reveal(2, 1) // reveal the mine directly
+	if x, y, ok := g.HitMine(); !ok || x != 2 || y != 1 {
+		t.Errorf("Reveal: HitMine = (%d,%d,%v), want (2,1,true)", x, y, ok)
+	}
+
+	g2 := newWithMines(t, 4, 4, [][2]int{{2, 1}})
+	g2.Reveal(1, 0)    // a "1"
+	g2.CycleFlag(0, 0) // wrong flag, count matches
+	g2.Chord(1, 0)     // opens (2,1): Lost
+	if g2.Status() != Lost {
+		t.Fatal("setup: expected Lost via chord")
+	}
+	if x, y, ok := g2.HitMine(); !ok || x != 2 || y != 1 {
+		t.Errorf("Chord: HitMine = (%d,%d,%v), want (2,1,true)", x, y, ok)
+	}
+}
+
 func TestRevealEdgeCases(t *testing.T) {
 	g := cornerBoard(t)
 	g.CycleFlag(1, 1)
