@@ -69,4 +69,8 @@ func TestWinViaChord(t *testing.T) {
 	if g.Status() != Won {
 		t.Fatalf("status = %v, want Won (win must be detectable via chord)", g.Status())
 	}
+	// The pre-flagged mine must not be double-counted by autoFlagMines.
+	if g.MinesRemaining() != 0 {
+		t.Errorf("MinesRemaining after win with pre-flagged mine = %d, want 0", g.MinesRemaining())
+	}
 }
