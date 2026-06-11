@@ -78,3 +78,30 @@ func TestCellAtOutOfBounds(t *testing.T) {
 		}
 	}
 }
+
+// Audit finding: every other engine test indexes only square boards, so a
+// width/height transposition in inBounds — which dead-zones columns
+// x >= height and panics on some coordinates for every non-square game,
+// including the Expert preset (30x16) — survived the entire suite.
+func TestNonSquareBoardCoordinates(t *testing.T) {
+	g := newWithMines(t, 3, 2, [][2]int{{0, 0}}) // wider than tall
+	if _, ok := g.CellAt(2, 1); !ok {
+		t.Fatal("CellAt(2,1) reported out of bounds on a 3x2 board")
+	}
+	if g.Reveal(0, 2) {
+		t.Error("Reveal(0,2) is out of bounds on a 3x2 board and must be a no-op")
+	}
+	if !g.Reveal(2, 0) {
+		t.Error("Reveal(2,0) is in bounds on a 3x2 board and must succeed")
+	}
+	if got := stateAt(t, g, 2, 0); got != Revealed {
+		t.Errorf("(2,0) state = %v, want Revealed", got)
+	}
+	// Win the rectangle: reveal the remaining safe cells.
+	for _, p := range [][2]int{{1, 0}, {0, 1}, {1, 1}, {2, 1}} {
+		g.Reveal(p[0], p[1])
+	}
+	if g.Status() != Won {
+		t.Fatalf("status = %v, want Won (non-square board must be winnable)", g.Status())
+	}
+}
