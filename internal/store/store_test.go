@@ -34,6 +34,29 @@ func TestLoadCorruptedFileReturnsEmpty(t *testing.T) {
 	}
 }
 
+func TestLoadNullScoresFileNeverPanics(t *testing.T) {
+	s, path := tempStore(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// json.Unmarshal accepts the literal `null` with err == nil and a nil
+	// map; Load must still return a usable empty Scores so the next
+	// RecordIfBest does not panic on assignment to a nil map.
+	if err := os.WriteFile(path, []byte(`null`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Load(); len(got) != 0 {
+		t.Errorf("Load() on null file = %v, want empty", got)
+	}
+	saved, err := s.RecordIfBest("beginner", 33)
+	if !saved || err != nil {
+		t.Errorf("RecordIfBest over null file = (%v, %v), want (true, nil)", saved, err)
+	}
+	if got := s.Load()["beginner"]; got != 33 {
+		t.Errorf("best after recovery = %d, want 33", got)
+	}
+}
+
 func TestSaveLoadRoundTrip(t *testing.T) {
 	s, _ := tempStore(t)
 	want := store.Scores{"beginner": 42, "expert": 311}
