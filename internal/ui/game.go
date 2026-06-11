@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/wallymagill/mines/internal/engine"
 	"github.com/wallymagill/mines/internal/store"
 )
@@ -137,4 +140,110 @@ func (m gameModel) recordIfWon() gameModel {
 	}
 	m.newBest = isBest
 	return m
+}
+
+func (m gameModel) View() string {
+	var b strings.Builder
+	b.WriteString(m.hudView())
+	b.WriteString("\n\n")
+	b.WriteString(m.boardView())
+	b.WriteString("\n")
+	b.WriteString(m.statusLine())
+	return b.String()
+}
+
+func (m gameModel) hudView() string {
+	face := "🙂"
+	switch m.game.Status() {
+	case engine.Won:
+		face = "😎"
+	case engine.Lost:
+		face = "💀"
+	}
+	return styleHUD.Render(fmt.Sprintf(" 🚩 %03d   %s   ⏱ %03d",
+		m.game.MinesRemaining(), face, m.elapsed))
+}
+
+func (m gameModel) boardView() string {
+	var b strings.Builder
+	over := m.game.Status() == engine.Won || m.game.Status() == engine.Lost
+	for y := 0; y < m.game.Height(); y++ {
+		for x := 0; x < m.game.Width(); x++ {
+			onCursor := x == m.cursorX && y == m.cursorY && !over
+			// Cursor brackets live in the separator columns.
+			switch {
+			case onCursor:
+				b.WriteString("[")
+			case x > 0 && m.cursorY == y && m.cursorX == x-1 && !over:
+				b.WriteString("]")
+			default:
+				b.WriteString(" ")
+			}
+			b.WriteString(m.cellView(x, y, onCursor))
+		}
+		if m.cursorY == y && m.cursorX == m.game.Width()-1 && !over {
+			b.WriteString("]")
+		}
+		b.WriteString("\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func (m gameModel) cellView(x, y int, onCursor bool) string {
+	cell, _ := m.game.CellAt(x, y)
+	lost := m.game.Status() == engine.Lost
+	glyph, style := m.cellGlyph(cell, lost)
+	if onCursor {
+		return styleCursor.Render(glyph)
+	}
+	return style.Render(glyph)
+}
+
+func (m gameModel) cellGlyph(cell engine.Cell, lost bool) (string, lipgloss.Style) {
+	switch {
+	case lost && cell.Mine && cell.State != engine.Flagged:
+		return glyphMine, styleMine
+	case lost && !cell.Mine && cell.State == engine.Flagged:
+		return glyphWrong, styleMine
+	case cell.State == engine.Flagged:
+		return glyphFlag, styleFlag
+	case cell.State == engine.Questioned:
+		return glyphQuestion, styleFlag
+	case cell.State != engine.Revealed:
+		return glyphHidden, styleHidden
+	case cell.Adjacent == 0:
+		return glyphEmpty, styleFaint
+	default:
+		return fmt.Sprintf("%d ", cell.Adjacent), numberStyles[cell.Adjacent]
+	}
+}
+
+func (m gameModel) statusLine() string {
+	if m.showHelp {
+		return styleFaint.Render(strings.Join([]string{
+			"",
+			" hjkl / arrows  move cursor",
+			" space / enter  reveal (chord on a revealed number)",
+			" f              flag → ? → clear",
+			" c              chord",
+			" n              new game   m  menu   q  quit",
+			"",
+			" any key to close help",
+		}, "\n"))
+	}
+	switch m.game.Status() {
+	case engine.Won:
+		s := fmt.Sprintf(" 😎 Cleared in %ds", m.elapsed)
+		if m.newBest {
+			s += " — NEW BEST!"
+		}
+		if m.saveErr {
+			s += styleErr.Render("  (could not save score)")
+		}
+		return s + styleFaint.Render("  · n new · m menu")
+	case engine.Lost:
+		return " 💀 Boom." + styleFaint.Render("  · n new · m menu")
+	default:
+		return styleFaint.Render(" hjkl move · spc reveal · f flag · c chord · n new · ? help · m menu · q quit")
+	}
 }
