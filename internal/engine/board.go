@@ -42,11 +42,14 @@ type Game struct {
 	cells                []Cell
 	status               Status
 	minesPlaced          bool
-	rng                  *rand.Rand
-	flags                int
-	revealed             int
-	hitX, hitY           int
-	mineHit              bool
+	// rng is math/rand v1 by choice: rand.New(rand.NewSource(seed)) is not
+	// deprecated and int64 seeding keeps tests ergonomic. v2 offers nothing
+	// this package needs.
+	rng        *rand.Rand
+	flags      int
+	revealed   int
+	hitX, hitY int
+	mineHit    bool
 }
 
 func New(width, height, mines int, rng *rand.Rand) (*Game, error) {
@@ -65,6 +68,8 @@ func New(width, height, mines int, rng *rand.Rand) (*Game, error) {
 	}, nil
 }
 
+// Width, Height, and Mines return the board configuration passed to New.
+// Status returns the current game lifecycle state.
 func (g *Game) Width() int     { return g.width }
 func (g *Game) Height() int    { return g.height }
 func (g *Game) Mines() int     { return g.mines }
