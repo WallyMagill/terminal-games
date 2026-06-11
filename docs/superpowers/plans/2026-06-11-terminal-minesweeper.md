@@ -1329,6 +1329,15 @@ git commit -m "feat: atomic JSON best-times store with record-if-best"
 > values 0 (sub-second win) and 999 (timer cap) are reachable in play and
 > load untouched.
 
+> **Execution amendment (audit-driven):** `Save` removes `path+".tmp"`
+> (best effort) when the rename step fails — e.g. the scores path occupied
+> by a directory, or the parent directory's write bit lost between the two
+> calls. Atomicity already held (a failed save never touched an existing
+> good file), but the temp file was orphaned on that path; the standard
+> atomic-write idiom cleans it up, and `TestSaveLeavesNoTempFile` already
+> pinned the no-stray-temp intent for the success path. The rename error
+> is still returned to the caller either way.
+
 ---
 
 ### Task 9: UI presets and styles

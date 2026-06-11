@@ -121,6 +121,22 @@ func TestSaveLeavesNoTempFile(t *testing.T) {
 	}
 }
 
+func TestSaveRenameFailureLeavesNoTempFile(t *testing.T) {
+	// Force the rename (not the write) to fail: occupy s.path with a
+	// directory. The write of path+".tmp" succeeds, the rename cannot.
+	path := filepath.Join(t.TempDir(), "scores.json")
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := store.New(path)
+	if err := s.Save(store.Scores{"beginner": 1}); err == nil {
+		t.Fatal("Save onto a directory should fail")
+	}
+	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
+		t.Errorf("%s.tmp left behind after rename failure", path)
+	}
+}
+
 func TestRecordIfBest(t *testing.T) {
 	s, _ := tempStore(t)
 	tests := []struct {

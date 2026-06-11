@@ -64,7 +64,11 @@ func (s *Store) Save(sc Scores) error {
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		return err
 	}
-	return os.Rename(tmp, s.path)
+	if err := os.Rename(tmp, s.path); err != nil {
+		os.Remove(tmp) // best effort: don't orphan the temp file
+		return err
+	}
+	return nil
 }
 
 // RecordIfBest saves secs under key if it beats the current best.
