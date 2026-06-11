@@ -1693,6 +1693,13 @@ git add internal/ui/game.go internal/ui/game_test.go
 git commit -m "feat: game model with cursor, key routing, and timer start"
 ```
 
+> **Execution amendment (review-driven):** `tickMsg` became `struct{ gen int }`
+> with a `tickGen` generation counter on the model — a stale tick surviving an
+> `n` restart otherwise creates a second tick loop (2× timer, corrupted best
+> times). `n` bumps the generation; mismatched ticks are dropped without
+> rescheduling. activate() starts the timer only when status is exactly
+> `Playing`. Chord routing, arrow keys, and up/left movement gained tests.
+
 ---
 
 ### Task 11: Game model — timer ticks and best-time recording
@@ -2548,6 +2555,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.menu.err = err.Error()
 			return a, nil
 		}
+		// Thread the tick generation across rounds: a tick loop from the
+		// previous game may still be in flight, and a fresh model at gen 0
+		// would mistake it for its own.
+		gm.tickGen = a.game.tickGen + 1
 		a.game = gm
 		a.view = viewGame
 		return a, nil
