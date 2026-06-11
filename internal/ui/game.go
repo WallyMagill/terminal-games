@@ -194,7 +194,8 @@ func (m gameModel) cellView(x, y int, onCursor bool) string {
 	lost := m.game.Status() == engine.Lost
 	glyph, style := m.cellGlyph(cell, lost)
 	if onCursor {
-		return styleCursor.Render(glyph)
+		// Reverse the cell's own style so the number keeps its color.
+		return style.Reverse(true).Render(glyph)
 	}
 	return style.Render(glyph)
 }
@@ -220,7 +221,9 @@ func (m gameModel) cellGlyph(cell engine.Cell, lost bool) (string, lipgloss.Styl
 
 func (m gameModel) statusLine() string {
 	if m.showHelp {
-		return styleFaint.Render(strings.Join([]string{
+		// Style each line individually: a multi-line Render pads every line
+		// to the widest, leaving trailing whitespace.
+		lines := []string{
 			"",
 			" hjkl / arrows  move cursor",
 			" space / enter  reveal (chord on a revealed number)",
@@ -229,7 +232,11 @@ func (m gameModel) statusLine() string {
 			" n              new game   m  menu   q  quit",
 			"",
 			" any key to close help",
-		}, "\n"))
+		}
+		for i, l := range lines {
+			lines[i] = styleFaint.Render(l)
+		}
+		return strings.Join(lines, "\n")
 	}
 	switch m.game.Status() {
 	case engine.Won:

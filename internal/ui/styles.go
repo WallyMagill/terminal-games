@@ -31,7 +31,6 @@ var (
 	styleHidden = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	styleFlag   = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 	styleMine   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	styleCursor = lipgloss.NewStyle().Reverse(true)
 	styleHUD    = lipgloss.NewStyle().Bold(true)
 	styleFaint  = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	styleTitle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11"))

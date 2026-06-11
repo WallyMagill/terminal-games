@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"math/rand"
 	"strings"
 	"testing"
+
+	"github.com/wallymagill/mines/internal/store"
 )
 
 func TestViewGoldenInitialBoard(t *testing.T) {
@@ -61,5 +64,32 @@ func TestViewHelpOverlay(t *testing.T) {
 	v := m.View()
 	if !strings.Contains(v, "chord") || !strings.Contains(v, "flag") {
 		t.Error("help overlay should list key bindings")
+	}
+}
+
+func TestViewWonShowsCelebrationAndAutoFlags(t *testing.T) {
+	s := store.New(t.TempDir() + "/scores.json")
+	p := Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}
+	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			m.cursorX, m.cursorY = x, y
+			if c, _ := m.game.CellAt(x, y); !c.Mine {
+				m, _ = m.Update(key(" "))
+			}
+		}
+	}
+	v := m.View()
+	for _, want := range []string{"😎", "Cleared in", "NEW BEST!", "⚑"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("won view missing %q:\n%s", want, v)
+		}
+	}
+	m.saveErr = true
+	if !strings.Contains(m.View(), "could not save score") {
+		t.Error("won view with saveErr must show the save warning")
 	}
 }
