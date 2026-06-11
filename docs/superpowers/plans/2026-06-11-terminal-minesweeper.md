@@ -519,7 +519,9 @@ func stateAt(t *testing.T, g *Game, x, y int) CellState {
 	return c.State
 }
 
-// Board fixture used across reveal/chord tests (4x4, mines at corners):
+// Board fixture used across reveal/chord tests (4x4, mines on the diagonal).
+// Note the two zero regions — top-right {(2,0),(3,0)} and bottom-left
+// {(0,2),(0,3)} — are NOT connected; the numbered border stops the flood.
 //
 //	*  1  .  .        x→
 //	1  2  1  1     y
@@ -545,30 +547,36 @@ func TestRevealNumberedCellRevealsOnlyIt(t *testing.T) {
 func TestRevealZeroFloodsRegion(t *testing.T) {
 	g := cornerBoard(t)
 	g.Reveal(3, 0) // zero cell, top-right
-	// The connected zero region plus its numbered border opens; on this board
-	// that is everything except the two mines.
-	for y := 0; y < 4; y++ {
-		for x := 0; x < 4; x++ {
-			c, _ := g.CellAt(x, y)
-			if c.Mine {
-				if c.State == Revealed {
-					t.Errorf("mine (%d,%d) revealed by flood", x, y)
-				}
-				continue
-			}
-			if c.State != Revealed {
-				t.Errorf("safe cell (%d,%d) not revealed by flood", x, y)
-			}
+	// The connected zero region {(2,0),(3,0)} opens with its numbered border;
+	// the disconnected bottom-left zero region must stay hidden — floods do
+	// not leak through numbered borders.
+	wantRevealed := [][2]int{{2, 0}, {3, 0}, {1, 0}, {1, 1}, {2, 1}, {3, 1}}
+	wantHidden := [][2]int{{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}, {3, 2}, {3, 3}}
+	for _, p := range wantRevealed {
+		if got := stateAt(t, g, p[0], p[1]); got != Revealed {
+			t.Errorf("(%d,%d) state = %v, want Revealed", p[0], p[1], got)
+		}
+	}
+	for _, p := range wantHidden {
+		if got := stateAt(t, g, p[0], p[1]); got != Hidden {
+			t.Errorf("(%d,%d) state = %v, want Hidden (flood must not cross borders)", p[0], p[1], got)
 		}
 	}
 }
 
 func TestFloodSkipsFlaggedCells(t *testing.T) {
 	g := cornerBoard(t)
-	g.CycleFlag(3, 3) // flag a safe cell in the flood region
+	g.CycleFlag(2, 0) // flag a ZERO cell inside the flood region
 	g.Reveal(3, 0)
-	if got := stateAt(t, g, 3, 3); got != Flagged {
+	if got := stateAt(t, g, 2, 0); got != Flagged {
 		t.Errorf("flagged cell state = %v, want Flagged (flood must not open flags)", got)
+	}
+	// The flag also blocks expansion through it: cells reachable only via
+	// (2,0) stay hidden.
+	for _, p := range [][2]int{{1, 0}, {1, 1}} {
+		if got := stateAt(t, g, p[0], p[1]); got != Hidden {
+			t.Errorf("(%d,%d) state = %v, want Hidden (flag blocks flood expansion)", p[0], p[1], got)
+		}
 	}
 }
 
