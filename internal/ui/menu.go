@@ -107,10 +107,18 @@ func (m menuModel) updateForm(keyMsg tea.KeyMsg) (menuModel, tea.Cmd) {
 		m.err = ""
 		return m, startGame(p)
 	default:
-		s := keyMsg.String()
-		if len(s) == 1 && s[0] >= '0' && s[0] <= '9' && len(m.form.fields[m.form.active]) < 3 {
-			m.form.fields[m.form.active] += s
-			m.err = ""
+		// Pastes and coalesced fast typing arrive as one multi-rune KeyRunes
+		// msg, and Key.String() wraps bracketed pastes in brackets ("[5]"),
+		// so filter msg.Runes directly: each rune is treated exactly as if
+		// typed — digits append up to the 3-char cap, non-digits are ignored.
+		if keyMsg.Type != tea.KeyRunes || keyMsg.Alt {
+			break
+		}
+		for _, r := range keyMsg.Runes {
+			if r >= '0' && r <= '9' && len(m.form.fields[m.form.active]) < 3 {
+				m.form.fields[m.form.active] += string(r)
+				m.err = ""
+			}
 		}
 	}
 	return m, nil

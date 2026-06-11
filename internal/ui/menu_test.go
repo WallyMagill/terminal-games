@@ -193,6 +193,53 @@ func TestCustomFormEditing(t *testing.T) {
 	}
 }
 
+// Bubble Tea delivers terminal pastes and coalesced fast typing as a single
+// multi-rune KeyRunes message, and Key.String() wraps bracketed pastes in
+// brackets ("[5]"), so the form must filter msg.Runes directly instead of
+// trusting String(). The rule: a multi-rune message behaves exactly as if
+// each character were typed — digits append in order up to the 3-char cap,
+// non-digits are ignored per rune.
+func TestCustomFormAcceptsMultiRuneInput(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  tea.KeyMsg
+		want string
+	}{
+		{"coalesced fast typing", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("12")}, "12"},
+		{"bracketed paste", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("12"), Paste: true}, "12"},
+		{"single-digit bracketed paste", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("5"), Paste: true}, "5"},
+		{"non-digits filtered per rune", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("16x16"), Paste: true}, "161"},
+		{"capped at three digits", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1234"), Paste: true}, "123"},
+		{"all-non-digit paste ignored", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("ab"), Paste: true}, ""},
+		{"alt-modified rune still ignored", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("5"), Alt: true}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := openForm(t, testMenu())
+			m, _ = m.Update(tt.msg)
+			if got := m.form.fields[0]; got != tt.want {
+				t.Errorf("width field after %v = %q, want %q", tt.msg, got, tt.want)
+			}
+		})
+	}
+}
+
+// Error-clearing matches single-key semantics: a paste that lands at least
+// one digit clears a stale validation error; a paste with no digits leaves
+// it untouched, like pressing a non-digit key.
+func TestCustomFormPasteErrorClearing(t *testing.T) {
+	m := openForm(t, testMenu())
+	m.err = "stale"
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("xy"), Paste: true})
+	if m.err != "stale" {
+		t.Error("paste with no digits should not touch the validation error")
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("12"), Paste: true})
+	if m.err != "" {
+		t.Error("accepted paste should clear a stale validation error")
+	}
+}
+
 func TestFormViewRendersFieldsAndCursor(t *testing.T) {
 	m := openForm(t, testMenu())
 	m, _ = m.Update(key("9"))

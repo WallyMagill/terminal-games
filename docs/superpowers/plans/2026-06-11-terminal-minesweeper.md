@@ -2456,6 +2456,16 @@ git commit -m "feat: menu with presets, best times, validated custom form"
 > to the widest preset (`%-5s`; `×` is a single rune and column), aligning the
 > `best:` column across all rows with or without recorded times.
 
+> **Execution amendment (audit-driven):** `updateForm`'s digit branch pinned
+> above trusted `Key.String()` and accepted only single-byte strings, which
+> silently dropped pasted input and rune-batched fast typing — Bubble Tea
+> delivers both as one multi-rune `KeyRunes` message, and bracketed pastes
+> additionally stringify wrapped in brackets (`"[5]"`). The default branch now
+> iterates `msg.Runes` of unmodified `KeyRunes` messages and applies the digit
+> filter per rune: a multi-rune message behaves exactly as if each character
+> were typed — digits append in order up to the 3-char cap, non-digits are
+> ignored. Single-key typing and alt-modified runes behave as before.
+
 ---
 
 ### Task 14: App root model and main wiring
