@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wallymagill/mines/internal/engine"
 	"github.com/wallymagill/mines/internal/store"
 )
 
@@ -37,24 +38,52 @@ func TestViewShowsRevealedNumbersAndEmpty(t *testing.T) {
 func TestViewLostShowsMinesAndStatus(t *testing.T) {
 	m := testGameModel(t)
 	m, _ = m.Update(key(" ")) // start: places mines
-	// Move the cursor onto a mine and reveal it.
+	// Wrong-flag one safe hidden cell, question-mark another, then find a mine.
+	var mineX, mineY int
+	marked := 0
 	for y := 0; y < 4; y++ {
 		for x := 0; x < 4; x++ {
-			if c, _ := m.game.CellAt(x, y); c.Mine {
+			c, _ := m.game.CellAt(x, y)
+			if c.Mine {
+				mineX, mineY = x, y
+				continue
+			}
+			if c.State == engine.Hidden && marked < 2 {
 				m.cursorX, m.cursorY = x, y
+				m, _ = m.Update(key("f")) // → Flagged
+				if marked == 1 {
+					m, _ = m.Update(key("f")) // second cell → Questioned
+				}
+				marked++
 			}
 		}
 	}
+	m.cursorX, m.cursorY = mineX, mineY
 	m, _ = m.Update(key(" "))
 	v := m.View()
 	if !strings.Contains(v, "✱") {
 		t.Error("lost view must expose mines")
+	}
+	if !strings.Contains(v, "✕") {
+		t.Error("lost view must mark the wrong flag with ✕")
+	}
+	if !strings.Contains(v, "?") {
+		t.Error("lost view must keep the question mark on safe cells")
 	}
 	if !strings.Contains(v, "💀") {
 		t.Error("lost view must show the dead face")
 	}
 	if !strings.Contains(v, "n new") {
 		t.Error("lost view must show restart hint")
+	}
+}
+
+func TestViewCursorAtRightEdgeClosesBracket(t *testing.T) {
+	m := testGameModel(t)
+	m.cursorX, m.cursorY = m.game.Width()-1, 0
+	rows := strings.Split(m.View(), "\n")
+	if got := rows[2]; !strings.HasSuffix(got, "]") {
+		t.Errorf("cursor on last column must close its bracket, got %q", got)
 	}
 }
 
