@@ -11,10 +11,12 @@ import (
 // best completion time in seconds.
 type Scores map[string]int
 
+// Store reads and writes a single scores file.
 type Store struct {
 	path string
 }
 
+// New returns a Store backed by the JSON file at path.
 func New(path string) *Store { return &Store{path: path} }
 
 // DefaultPath is os.UserConfigDir()/mines/scores.json
@@ -58,7 +60,8 @@ func (s *Store) Save(sc Scores) error {
 }
 
 // RecordIfBest saves secs under key if it beats the current best.
-// It reports whether a new record was written.
+// It reports whether a new record was achieved; on error the record was
+// achieved but could not be persisted.
 func (s *Store) RecordIfBest(key string, secs int) (bool, error) {
 	sc := s.Load()
 	if best, ok := sc[key]; ok && best <= secs {

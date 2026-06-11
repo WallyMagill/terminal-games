@@ -84,3 +84,20 @@ func TestRecordIfBest(t *testing.T) {
 		})
 	}
 }
+
+func TestCorruptFileRecoversOnNextSave(t *testing.T) {
+	s, path := tempStore(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := s.RecordIfBest("expert", 250)
+	if err != nil || !saved {
+		t.Fatalf("RecordIfBest over corrupt file = (%v, %v), want (true, nil)", saved, err)
+	}
+	if got := s.Load()["expert"]; got != 250 {
+		t.Errorf("best after recovery = %d, want 250", got)
+	}
+}
