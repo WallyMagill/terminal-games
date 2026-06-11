@@ -92,7 +92,7 @@ func TestAppCtrlCQuits(t *testing.T) {
 
 func TestAppTooSmallTerminal(t *testing.T) {
 	a := testApp(t)
-	model, _ := a.Update(startGameMsg{preset: presets[2]}) // Expert: needs 62 cols
+	model, _ := a.Update(startGameMsg{preset: presets[2]}) // Expert: 30 wide → needs 91 cols
 	a = model.(App)
 	model, _ = a.Update(tea.WindowSizeMsg{Width: 40, Height: 40})
 	a = model.(App)
