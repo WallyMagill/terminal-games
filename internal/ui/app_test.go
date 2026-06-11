@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/wallymagill/mines/internal/engine"
 	"github.com/wallymagill/mines/internal/store"
 )
@@ -76,6 +77,103 @@ func TestAppTooSmallExpertAt80Cols(t *testing.T) {
 	a = model.(App)
 	if !strings.Contains(a.View(), "too small") {
 		t.Error("Expert on an 80-column terminal should show the too-small message")
+	}
+}
+
+// A terminal exactly as tall as the rendered view must be accepted: the
+// guard's chrome-rows count has to match the real layout.
+func TestAppExactFitHeightPlays(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(startGameMsg{preset: Preset{Name: "T", Width: 4, Height: 4, Mines: 2}})
+	a = model.(App)
+	full := len(strings.Split(a.View(), "\n"))
+	model, _ = a.Update(tea.WindowSizeMsg{Width: 80, Height: full})
+	a = model.(App)
+	if strings.Contains(a.View(), "too small") {
+		t.Errorf("view occupies %d lines; a %d-row terminal must be accepted:\n%s",
+			full, full, a.View())
+	}
+}
+
+// When the guard accepts a terminal, no rendered line may be wider than it:
+// bubbletea hard-truncates over-wide lines, silently cutting off key hints.
+func TestAppNarrowAcceptedTerminalChromeFits(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(tea.WindowSizeMsg{Width: 50, Height: 20})
+	a = model.(App)
+	model, _ = a.Update(startGameMsg{preset: presets[0]})
+	a = model.(App)
+	v := a.View()
+	if strings.Contains(v, "too small") {
+		t.Fatal("Beginner must be accepted on a 50×20 terminal")
+	}
+	for _, line := range strings.Split(v, "\n") {
+		if w := lipgloss.Width(line); w > 50 {
+			t.Errorf("line is %d cols wide on an accepted 50-col terminal: %q", w, line)
+		}
+	}
+}
+
+// The too-small screen must itself fit the terminal that triggered it —
+// otherwise the "need W×H" payload it exists to convey is truncated away.
+func TestAppTooSmallMessageFitsTrigger(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(tea.WindowSizeMsg{Width: 27, Height: 15})
+	a = model.(App)
+	model, _ = a.Update(startGameMsg{preset: presets[0]})
+	a = model.(App)
+	v := a.View()
+	if !strings.Contains(v, "too small") {
+		t.Fatal("27×15 must trigger the too-small screen for Beginner")
+	}
+	lines := strings.Split(v, "\n")
+	if len(lines) > 15 {
+		t.Errorf("too-small screen has %d lines on a 15-row terminal", len(lines))
+	}
+	for _, line := range lines {
+		if w := lipgloss.Width(line); w > 27 {
+			t.Errorf("too-small line is %d cols on the 27-col terminal that triggered it: %q", w, line)
+		}
+	}
+}
+
+// The too-small screen says "press m for menu"; the first m must obey even
+// if the help overlay was open (and hidden) when the terminal shrank.
+func TestAppTooSmallFirstMOpensMenuDespiteHelp(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(startGameMsg{preset: presets[0]})
+	a = model.(App)
+	model, _ = a.Update(key("?"))
+	a = model.(App)
+	model, _ = a.Update(tea.WindowSizeMsg{Width: 10, Height: 5})
+	a = model.(App)
+	if !strings.Contains(a.View(), "press m for menu") {
+		t.Fatal("expected the too-small instruction")
+	}
+	model, _ = a.Update(key("m"))
+	a = model.(App)
+	if a.view != viewMenu {
+		t.Errorf("first m on the too-small screen must open the menu, view = %v", a.view)
+	}
+}
+
+// While the too-small screen is up, game keys must not mutate the invisible
+// game — in particular ? must not re-open the overlay and swallow the next m.
+func TestAppTooSmallIgnoresGameKeys(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(startGameMsg{preset: presets[0]})
+	a = model.(App)
+	model, _ = a.Update(tea.WindowSizeMsg{Width: 10, Height: 5})
+	a = model.(App)
+	model, _ = a.Update(key("?"))
+	a = model.(App)
+	if a.game.showHelp {
+		t.Error("? while too small must not open the help overlay")
+	}
+	model, _ = a.Update(key("m"))
+	a = model.(App)
+	if a.view != viewMenu {
+		t.Error("m while too small must return to the menu")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/wallymagill/mines/internal/engine"
 	"github.com/wallymagill/mines/internal/store"
 )
@@ -120,5 +121,95 @@ func TestViewWonShowsCelebrationAndAutoFlags(t *testing.T) {
 	m.saveErr = true
 	if !strings.Contains(m.View(), "could not save score") {
 		t.Error("won view with saveErr must show the save warning")
+	}
+}
+
+// wonGameModel returns a freshly won 2×2 game (mirrors the seed-3 walk in
+// TestViewWonShowsCelebrationAndAutoFlags).
+func wonGameModel(t *testing.T) gameModel {
+	t.Helper()
+	s := store.New(t.TempDir() + "/scores.json")
+	p := Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}
+	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			m.cursorX, m.cursorY = x, y
+			if c, _ := m.game.CellAt(x, y); !c.Mine {
+				m, _ = m.Update(key(" "))
+			}
+		}
+	}
+	if m.game.Status() != engine.Won {
+		t.Fatal("seed-3 walk should win the 2×2 game")
+	}
+	return m
+}
+
+// Every status-line variant the game can show on the narrowest accepted
+// terminal (chromeCols wide) must actually fit it.
+func TestStatusLineCompactVariantsFit(t *testing.T) {
+	t.Run("playing", func(t *testing.T) {
+		m := testGameModel(t)
+		m.termW = chromeCols
+		if w := lipgloss.Width(m.statusLine()); w > chromeCols {
+			t.Errorf("playing hint is %d cols, max %d", w, chromeCols)
+		}
+	})
+	t.Run("won new best", func(t *testing.T) {
+		m := wonGameModel(t)
+		m.termW, m.elapsed, m.newBest = chromeCols, 999, true
+		s := m.statusLine()
+		if w := lipgloss.Width(s); w > chromeCols {
+			t.Errorf("won line %q is %d cols, max %d", s, w, chromeCols)
+		}
+		if !strings.Contains(s, "NEW BEST") {
+			t.Errorf("compact won line must keep the new-best callout: %q", s)
+		}
+	})
+	t.Run("won save error", func(t *testing.T) {
+		m := wonGameModel(t)
+		m.termW, m.elapsed, m.newBest, m.saveErr = chromeCols, 999, false, true
+		s := m.statusLine()
+		if w := lipgloss.Width(s); w > chromeCols {
+			t.Errorf("won line %q is %d cols, max %d", s, w, chromeCols)
+		}
+		if !strings.Contains(s, "save failed") {
+			t.Errorf("compact won line must keep the save warning: %q", s)
+		}
+	})
+	t.Run("lost", func(t *testing.T) {
+		m := testGameModel(t)
+		m, _ = m.Update(key(" ")) // place mines
+		for y := 0; y < 4; y++ {
+			for x := 0; x < 4; x++ {
+				if c, _ := m.game.CellAt(x, y); c.Mine {
+					m.cursorX, m.cursorY = x, y
+				}
+			}
+		}
+		m, _ = m.Update(key(" ")) // boom
+		if m.game.Status() != engine.Lost {
+			t.Fatal("revealing a mine should lose")
+		}
+		m.termW = chromeCols
+		if w := lipgloss.Width(m.statusLine()); w > chromeCols {
+			t.Errorf("lost line is %d cols, max %d", w, chromeCols)
+		}
+	})
+}
+
+// The help overlay holds the full key list; it must not clip in width on
+// any terminal the guard accepts.
+func TestHelpOverlayLinesFitChromeCols(t *testing.T) {
+	m := testGameModel(t)
+	m.termW = chromeCols
+	m, _ = m.Update(key("?"))
+	for _, line := range strings.Split(m.View(), "\n") {
+		if w := lipgloss.Width(line); w > chromeCols {
+			t.Errorf("overlay line %q is %d cols, max %d", line, w, chromeCols)
+		}
 	}
 }

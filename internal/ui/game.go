@@ -27,6 +27,7 @@ type gameModel struct {
 	cursorY  int
 	elapsed  int
 	tickGen  int
+	termW    int // last known terminal width; 0 = unknown, render full chrome
 	running  bool
 	recorded bool
 	newBest  bool
@@ -96,6 +97,7 @@ func (m gameModel) handleKey(k string) (gameModel, tea.Cmd) {
 			return m, nil // preset was already valid; keep current game
 		}
 		fresh.tickGen = m.tickGen + 1 // invalidate any in-flight tick
+		fresh.termW = m.termW         // keep adapting chrome to the terminal
 		return fresh, nil
 	case "?":
 		m.showHelp = true
@@ -222,14 +224,16 @@ func (m gameModel) cellGlyph(cell engine.Cell, lost bool) (string, lipgloss.Styl
 func (m gameModel) statusLine() string {
 	if m.showHelp {
 		// Style each line individually: a multi-line Render pads every line
-		// to the widest, leaving trailing whitespace.
+		// to the widest, leaving trailing whitespace. Every line stays
+		// within chromeCols so the overlay never clips in width on a
+		// terminal the guard accepted.
 		lines := []string{
 			"",
-			" hjkl / arrows  move cursor",
-			" space / enter  reveal (chord on a revealed number)",
-			" f              flag → ? → clear",
-			" c              chord",
-			" n              new game   m  menu   q  quit",
+			" hjkl/arrows  move",
+			" spc/enter    reveal / chord",
+			" f            flag → ? → clear",
+			" c            chord",
+			" n new · m menu · q quit",
 			"",
 			" any key to close help",
 		}
@@ -238,19 +242,27 @@ func (m gameModel) statusLine() string {
 		}
 		return strings.Join(lines, "\n")
 	}
+	// Full and compact variants: the compact ones all fit chromeCols, the
+	// narrowest terminal the too-small guard accepts.
 	switch m.game.Status() {
 	case engine.Won:
-		s := fmt.Sprintf(" 😎 Cleared in %ds", m.elapsed)
+		full := fmt.Sprintf(" 😎 Cleared in %ds", m.elapsed)
+		compact := fmt.Sprintf(" 😎 Cleared %ds", m.elapsed)
 		if m.newBest {
-			s += " — NEW BEST!"
+			full += " — NEW BEST!"
+			compact += " — NEW BEST!"
 		}
 		if m.saveErr {
-			s += styleErr.Render("  (could not save score)")
+			full += styleErr.Render("  (could not save score)")
+			compact += styleErr.Render(" (save failed)")
 		}
-		return s + styleFaint.Render("  · n new · m menu")
+		full += styleFaint.Render("  · n new · m menu")
+		return fitLine(m.termW, full, compact)
 	case engine.Lost:
 		return " 💀 Boom." + styleFaint.Render("  · n new · m menu")
 	default:
-		return styleFaint.Render(" hjkl move · spc reveal · f flag · c chord · n new · ? help · m menu · q quit")
+		return fitLine(m.termW,
+			styleFaint.Render(" hjkl move · spc reveal · f flag · c chord · n new · ? help · m menu · q quit"),
+			styleFaint.Render(" spc reveal · f flag · ? help"))
 	}
 }

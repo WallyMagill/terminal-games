@@ -2658,6 +2658,26 @@ git commit -m "feat: root model routing and program entry point"
 > custom-form fit check. Global m/esc/q interception also skips while the
 > help overlay is open, honoring "any key to close help".
 
+> **Execution amendment (audit-driven):** the too-small guard now sizes the
+> whole frame, not just the board grid — the chrome (HUD, status line) was
+> still truncated on terminals the guard accepted. `frameCols(w) =
+> max(boardCols(w), chromeCols)` and `frameRows(h) = h + boardChromeRows`
+> are shared by the App guard and the custom-form fit check. Rather than
+> demanding the 77-column key hint everywhere, the chrome adapts to the
+> terminal (the spec sketch shows compact in-frame hints): `fitLine` swaps
+> the full status/win lines for compact variants when the last
+> `WindowSizeMsg` width can't show them whole, and the help overlay — the
+> canonical full key list — was reflowed to the same budget, so
+> `chromeCols` is 30 and Beginner stays playable from 30×14 up, including
+> 80×24. `boardChromeRows` was also corrected from 6 to 5: the rendered
+> layout has a single interior blank (margin, HUD, blank, board, status,
+> margin), so exact-fit terminals are now accepted and the custom form
+> allows one more row of board. The too-small screen itself was stacked
+> into four short lines (≤ 20 columns, 6 rows) so it fits every terminal
+> that triggers it, entering the too-small state closes an open help
+> overlay, and all keys except m/esc/q are ignored while it shows — the
+> advertised "press m for menu" now always works on the first press.
+
 ---
 
 ### Task 15: Final verification

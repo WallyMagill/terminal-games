@@ -119,6 +119,21 @@ func TestCustomFormValidation(t *testing.T) {
 	}
 }
 
+// A terminal narrower than the game chrome fits no board at all: even a
+// 2×2 board's frame (HUD, status line) would be truncated there.
+func TestCustomFormRejectsBelowChromeWidth(t *testing.T) {
+	m := openForm(t, newMenuModel(store.Scores{}, chromeCols-1, 24))
+	for _, k := range []string{"2", "enter", "2", "enter", "1", "enter"} {
+		m, _ = m.Update(key(k))
+	}
+	if !strings.Contains(m.err, "too large") {
+		t.Errorf("err = %q, want a too-large error: a 29-col terminal cannot show the game chrome", m.err)
+	}
+	if !strings.Contains(m.err, "max 0×") {
+		t.Errorf("err = %q, want max width 0 when no board fits", m.err)
+	}
+}
+
 func TestCustomFormEscReturnsToList(t *testing.T) {
 	m := testMenu()
 	for i := 0; i < 3; i++ {

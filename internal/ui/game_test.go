@@ -168,6 +168,16 @@ func TestNRestartsGame(t *testing.T) {
 	}
 }
 
+func TestNRestartPreservesTermW(t *testing.T) {
+	m := testGameModel(t)
+	m.termW = chromeCols
+	m, _ = m.Update(key(" "))
+	m, _ = m.Update(key("n"))
+	if m.termW != chromeCols {
+		t.Errorf("termW after restart = %d, want %d (chrome must keep adapting)", m.termW, chromeCols)
+	}
+}
+
 func TestHelpOverlayToggles(t *testing.T) {
 	m := testGameModel(t)
 	m, _ = m.Update(key("?"))

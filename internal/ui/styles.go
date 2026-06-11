@@ -12,12 +12,35 @@ const (
 	glyphWrong    = "✕ " // a flag that was not a mine, shown on loss
 )
 
-// boardChromeRows: HUD (1) + blank (1) + blank (1) + status (1) + margins (2).
-const boardChromeRows = 6
+// boardChromeRows is the game view's chrome height in rows: HUD (1) + the
+// blank line under it (1) + status line (1) + the App's margins above and
+// below (2). Pinned against a rendered View in tests.
+const boardChromeRows = 5
+
+// chromeCols is the game frame's minimum width in columns: the HUD, the
+// compact status variants, and the help overlay all fit within it. Wider
+// full-length hints are swapped in by fitLine only when the terminal can
+// show them whole.
+const chromeCols = 30
 
 // boardCols is the rendered width of a board: 3 columns per cell (separator
 // + 2-char glyph) plus the cursor's trailing bracket on the last column.
 func boardCols(w int) int { return 3*w + 1 }
+
+// frameCols and frameRows are the terminal size a w×h board's full game
+// view needs — board plus chrome. Shared by the App's too-small guard and
+// the custom-form fit check so the two can never disagree.
+func frameCols(w int) int { return max(boardCols(w), chromeCols) }
+func frameRows(h int) int { return h + boardChromeRows }
+
+// fitLine returns full if it fits a terminal termW columns wide (or if the
+// width is not yet known), otherwise the compact variant.
+func fitLine(termW int, full, compact string) string {
+	if termW <= 0 || lipgloss.Width(full) <= termW {
+		return full
+	}
+	return compact
+}
 
 // Classic Windows minesweeper number palette.
 var numberStyles = map[int]lipgloss.Style{
