@@ -2,6 +2,7 @@ package ui
 
 import (
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/wallymagill/mines/internal/store"
@@ -96,6 +97,34 @@ func TestWinRecordsBestTimeForPreset(t *testing.T) {
 	}
 	if !m.newBest {
 		t.Error("first win should be flagged as a new best")
+	}
+}
+
+// An accidental keypress after a new-best win must not re-run the record
+// path: a second RecordIfBest call reports isBest=false (best <= secs) and
+// would erase the NEW BEST! celebration. recordIfWon's m.recorded guard
+// prevents that.
+func TestNewBestSurvivesExtraKeypressAfterWin(t *testing.T) {
+	s := store.New(t.TempDir() + "/scores.json")
+	p := Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}
+	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			m.cursorX, m.cursorY = x, y
+			if c, _ := m.game.CellAt(x, y); !c.Mine {
+				m, _ = m.Update(key(" "))
+			}
+		}
+	}
+	if !m.newBest {
+		t.Fatal("setup: first win should be a new best")
+	}
+	m, _ = m.Update(key(" ")) // accidental double-tap after the win
+	if !m.newBest || !strings.Contains(m.View(), "NEW BEST!") {
+		t.Errorf("extra keypress erased the NEW BEST celebration (newBest = %v)", m.newBest)
 	}
 }
 
