@@ -60,7 +60,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return a, tea.Quit
 		}
-		if a.view == viewGame {
+		if a.view == viewGame && !a.game.showHelp {
 			switch msg.String() {
 			case "m", "esc":
 				a.view = viewMenu
@@ -85,7 +85,7 @@ func (a App) View() string {
 	if a.view != viewGame {
 		return "\n" + a.menu.View() + "\n"
 	}
-	needW := a.game.game.Width()*2 + 2
+	needW := boardCols(a.game.game.Width())
 	needH := a.game.game.Height() + boardChromeRows
 	if a.termW > 0 && (a.termW < needW || a.termH < needH) {
 		return fmt.Sprintf(

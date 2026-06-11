@@ -15,6 +15,10 @@ const (
 // boardChromeRows: HUD (1) + blank (1) + blank (1) + status (1) + margins (2).
 const boardChromeRows = 6
 
+// boardCols is the rendered width of a board: 3 columns per cell (separator
+// + 2-char glyph) plus the cursor's trailing bracket on the last column.
+func boardCols(w int) int { return 3*w + 1 }
+
 // Classic Windows minesweeper number palette.
 var numberStyles = map[int]lipgloss.Style{
 	1: lipgloss.NewStyle().Foreground(lipgloss.Color("12")), // blue

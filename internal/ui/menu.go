@@ -128,9 +128,9 @@ func (f customForm) preset(termW, termH int) (Preset, error) {
 	if _, err := engine.New(w, h, mines, rand.New(rand.NewSource(0))); err != nil {
 		return Preset{}, err
 	}
-	if termW > 0 && termH > 0 && (w*2+2 > termW || h+boardChromeRows > termH) {
+	if termW > 0 && termH > 0 && (boardCols(w) > termW || h+boardChromeRows > termH) {
 		return Preset{}, fmt.Errorf("board too large for terminal (max %d×%d)",
-			max((termW-2)/2, 0), max(termH-boardChromeRows, 0))
+			max((termW-1)/3, 0), max(termH-boardChromeRows, 0))
 	}
 	return Preset{Name: "Custom", Width: w, Height: h, Mines: mines}, nil
 }

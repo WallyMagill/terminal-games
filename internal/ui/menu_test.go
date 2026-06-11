@@ -94,6 +94,7 @@ func TestCustomFormValidation(t *testing.T) {
 		{"board too small", []string{"1", "9", "5"}, "at least 2x2"},
 		{"too many mines", []string{"4", "4", "15"}, "mines must be"},
 		{"too big for terminal", []string{"99", "9", "10"}, "too large"},
+		{"too wide for 80 cols", []string{"30", "9", "10"}, "too large"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
