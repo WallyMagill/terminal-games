@@ -23,6 +23,26 @@ func TestTickIncrementsOnlyWhilePlaying(t *testing.T) {
 	}
 }
 
+// The rescheduled tick must carry the model's current generation: a mismatch
+// would be dropped as stale on the next Update and the timer would freeze at
+// one second forever. Pin it by executing the rescheduled cmd for real and
+// feeding the message it produces back through Update.
+func TestTickRescheduleCarriesCurrentGeneration(t *testing.T) {
+	m := testGameModel(t)
+	m, cmd := m.Update(key(" ")) // first reveal starts the timer loop
+	if cmd == nil {
+		t.Fatal("first reveal must schedule a tick")
+	}
+	m, cmd = m.Update(tickMsg{gen: m.tickGen}) // tick 1 lands
+	if m.elapsed != 1 || cmd == nil {
+		t.Fatalf("after tick 1: elapsed = %d (want 1), cmd nil = %v", m.elapsed, cmd == nil)
+	}
+	m, cmd = m.Update(cmd()) // run the reschedule (~1s) and land tick 2
+	if m.elapsed != 2 || cmd == nil {
+		t.Fatalf("after tick 2: elapsed = %d, want 2 (rescheduled tick was dropped as stale)", m.elapsed)
+	}
+}
+
 func TestTimerCapsAt999(t *testing.T) {
 	m := testGameModel(t)
 	m, _ = m.Update(key(" "))
