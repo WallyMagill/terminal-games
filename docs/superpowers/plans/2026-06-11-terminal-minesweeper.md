@@ -2058,6 +2058,14 @@ git add internal/ui/
 git commit -m "feat: game view with HUD, board glyphs, status line, help overlay"
 ```
 
+> **Execution amendment (review-driven):** `cellView` renders the cursor by
+> reversing the cell's *own* style — `style.Reverse(true).Render(glyph)` —
+> instead of the flat `styleCursor` shown above, so a number under the
+> cursor keeps its classic color; `styleCursor` was dropped from Task 9's
+> styles block. The help overlay also styles each line individually rather
+> than one multi-line `Render`, which pads every line to the widest and
+> leaves trailing whitespace.
+
 > **Execution amendment (audit-driven):** the HUD's mine counter clamps its
 > *display* at -99, classic-minesweeper style — `%03d` emits four characters
 > at -100 and below (reachable by mass flagging on Intermediate/Expert),
