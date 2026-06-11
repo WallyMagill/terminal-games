@@ -37,7 +37,7 @@ func TestPlacementCountAndAdjacency(t *testing.T) {
 			}
 			want := 0
 			g.eachNeighbor(x, y, func(nx, ny int) {
-				if n, _ := g.CellAt(nx, ny); n.Mine {
+				if g.at(nx, ny).Mine { // white-box: eachNeighbor guarantees bounds
 					want++
 				}
 			})
@@ -53,6 +53,9 @@ func TestPlacementCountAndAdjacency(t *testing.T) {
 
 func TestRevealStartsGame(t *testing.T) {
 	g, _ := New(9, 9, 10, rand.New(rand.NewSource(7)))
+	if g.Status() != NotStarted {
+		t.Fatal("expected NotStarted before first reveal")
+	}
 	g.Reveal(0, 0)
 	if g.Status() != Playing && g.Status() != Won {
 		t.Errorf("status after first reveal = %v, want Playing (or Won)", g.Status())
