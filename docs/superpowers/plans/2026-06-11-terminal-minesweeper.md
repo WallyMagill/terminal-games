@@ -2408,6 +2408,12 @@ git add internal/ui/menu.go internal/ui/menu_test.go
 git commit -m "feat: menu with presets, best times, validated custom form"
 ```
 
+> **Execution amendment (review-driven):** the form became a value
+> (`form customForm` + `showForm bool`) instead of `*customForm` — pointer
+> mutation through a value receiver aliased old model copies. `itemCustom`/
+> `itemQuit` are derived from `len(presets)`; editing clears stale validation
+> errors; the fit check requires both terminal dims and clamps printed maxes.
+
 ---
 
 ### Task 14: App root model and main wiring
