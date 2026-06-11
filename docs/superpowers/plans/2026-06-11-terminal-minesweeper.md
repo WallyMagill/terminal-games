@@ -2650,6 +2650,14 @@ git add internal/ui/app.go internal/ui/app_test.go main.go
 git commit -m "feat: root model routing and program entry point"
 ```
 
+> **Execution amendment (review-driven):** the too-small guard's width math
+> was wrong in this plan — the renderer emits 3 columns per cell plus the
+> cursor's trailing bracket, so a width-W board needs `3W+1` columns, not
+> `2W+2` (Expert wrapped on an 80-column terminal with no guard). A shared
+> `boardCols()` helper in styles.go now feeds both the App guard and the
+> custom-form fit check. Global m/esc/q interception also skips while the
+> help overlay is open, honoring "any key to close help".
+
 ---
 
 ### Task 15: Final verification
