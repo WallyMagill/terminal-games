@@ -110,3 +110,37 @@ func (g *Game) eachNeighbor(x, y int, fn func(nx, ny int)) {
 		}
 	}
 }
+
+// placeMines fills the board on first reveal, excluding the clicked cell so
+// the first click is never a mine (classic rule — it may still be a number).
+func (g *Game) placeMines(safeX, safeY int) {
+	safe := safeY*g.width + safeX
+	candidates := make([]int, 0, len(g.cells)-1)
+	for i := range g.cells {
+		if i != safe {
+			candidates = append(candidates, i)
+		}
+	}
+	g.rng.Shuffle(len(candidates), func(i, j int) {
+		candidates[i], candidates[j] = candidates[j], candidates[i]
+	})
+	for _, idx := range candidates[:g.mines] {
+		g.cells[idx].Mine = true
+	}
+	g.computeAdjacency()
+	g.minesPlaced = true
+}
+
+func (g *Game) computeAdjacency() {
+	for y := 0; y < g.height; y++ {
+		for x := 0; x < g.width; x++ {
+			n := 0
+			g.eachNeighbor(x, y, func(nx, ny int) {
+				if g.at(nx, ny).Mine {
+					n++
+				}
+			})
+			g.at(x, y).Adjacent = n
+		}
+	}
+}
