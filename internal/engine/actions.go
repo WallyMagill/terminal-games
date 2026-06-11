@@ -70,10 +70,48 @@ func (g *Game) CycleFlag(x, y int) bool {
 	return false
 }
 
-// Chord is implemented in a later task; only the game-over guard exists now.
+// Chord opens all non-flagged neighbors of a revealed numbered cell when the
+// adjacent flag count equals its number. Questioned cells count as hidden and
+// are opened. A wrongly placed flag means a mine gets opened — that is a loss,
+// faithful to the original game.
 func (g *Game) Chord(x, y int) bool {
 	if g.status == Won || g.status == Lost || !g.inBounds(x, y) {
 		return false
 	}
-	return false
+	c := g.at(x, y)
+	if c.State != Revealed || c.Adjacent == 0 {
+		return false
+	}
+	flagged := 0
+	g.eachNeighbor(x, y, func(nx, ny int) {
+		if g.at(nx, ny).State == Flagged {
+			flagged++
+		}
+	})
+	if flagged != c.Adjacent {
+		return false
+	}
+	changed := false
+	g.eachNeighbor(x, y, func(nx, ny int) {
+		if g.status == Lost {
+			return // a mine already ended the game mid-chord
+		}
+		n := g.at(nx, ny)
+		if n.State == Flagged || n.State == Revealed {
+			return
+		}
+		if n.Mine {
+			n.State = Revealed
+			g.hitX, g.hitY, g.mineHit = nx, ny, true
+			g.status = Lost
+			changed = true
+			return
+		}
+		g.floodReveal(nx, ny)
+		changed = true
+	})
+	if g.status != Lost {
+		g.checkWin()
+	}
+	return changed
 }
