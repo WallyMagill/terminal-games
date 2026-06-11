@@ -57,6 +57,48 @@ func TestLoadNullScoresFileNeverPanics(t *testing.T) {
 	}
 }
 
+func TestLoadDropsOutOfRangeValues(t *testing.T) {
+	s, path := tempStore(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The UI timer starts at 0 and caps at 999, so no real game produces a
+	// value outside [0, 999]; such entries only come from hand edits or
+	// valid-JSON corruption. A negative "best" would otherwise block every
+	// legitimate future record for the preset forever.
+	raw := `{"beginner": -3, "intermediate": 1000, "expert": 250}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Load()
+	if len(got) != 1 || got["expert"] != 250 {
+		t.Errorf("Load() = %v, want only expert:250 kept", got)
+	}
+	saved, err := s.RecordIfBest("beginner", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !saved {
+		t.Error("RecordIfBest(1s) over tampered negative best = false: corrupt value permanently blocks records")
+	}
+}
+
+func TestLoadKeepsBoundaryValues(t *testing.T) {
+	s, path := tempStore(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// 0 (sub-second win) and 999 (timer cap) are both reachable in play.
+	raw := `{"beginner": 0, "expert": 999}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := s.Load()
+	if len(got) != 2 || got["beginner"] != 0 || got["expert"] != 999 {
+		t.Errorf("Load() = %v, want beginner:0 and expert:999 kept", got)
+	}
+}
+
 func TestSaveLoadRoundTrip(t *testing.T) {
 	s, _ := tempStore(t)
 	want := store.Scores{"beginner": 42, "expert": 311}

@@ -30,7 +30,10 @@ func DefaultPath() (string, error) {
 }
 
 // Load returns saved scores. A missing or corrupted file yields empty scores —
-// score I/O must never take the game down.
+// score I/O must never take the game down. Entries with values outside
+// [0, 999] are dropped: the UI timer starts at 0 and caps at 999, so such
+// values only come from hand edits or valid-JSON corruption, and a negative
+// "best" would permanently block every legitimate future record.
 func (s *Store) Load() Scores {
 	data, err := os.ReadFile(s.path)
 	if err != nil {
@@ -39,6 +42,11 @@ func (s *Store) Load() Scores {
 	var sc Scores
 	if err := json.Unmarshal(data, &sc); err != nil || sc == nil {
 		return Scores{}
+	}
+	for key, secs := range sc {
+		if secs < 0 || secs > 999 {
+			delete(sc, key)
+		}
 	}
 	return sc
 }

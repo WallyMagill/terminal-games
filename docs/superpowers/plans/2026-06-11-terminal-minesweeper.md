@@ -1319,6 +1319,16 @@ git add internal/store/
 git commit -m "feat: atomic JSON best-times store with record-if-best"
 ```
 
+> **Execution amendment (audit-driven):** `Load` drops entries whose value
+> lies outside [0, 999]. The UI timer starts at 0 and caps at 999, so no
+> real game can produce a value beyond that range — such entries only come
+> from hand edits or valid-JSON corruption. Previously they loaded
+> verbatim: a `{"beginner": -3}` file rendered `best: -03` in the menu and,
+> because `RecordIfBest` compares against the stored best, permanently
+> blocked every legitimate future record for that preset. The boundary
+> values 0 (sub-second win) and 999 (timer cap) are reachable in play and
+> load untouched.
+
 ---
 
 ### Task 9: UI presets and styles

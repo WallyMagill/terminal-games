@@ -272,6 +272,19 @@ func TestSaveFailureShowsHUDWarning(t *testing.T) {
 	}
 }
 
+// A tampered scores file with a negative best must not leak into the menu
+// as "best: -03" — out-of-range values are dropped on load.
+func TestMenuDropsTamperedNegativeBest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "scores.json")
+	if err := os.WriteFile(path, []byte(`{"beginner": -3}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	a := NewApp(store.New(path))
+	if v := a.View(); strings.Contains(v, "-03") {
+		t.Errorf("menu renders tampered negative best verbatim:\n%s", v)
+	}
+}
+
 func TestAppResizeWhileFormOpenRevalidates(t *testing.T) {
 	a := testApp(t)
 	// Navigate to Custom… and open the form through the App.
