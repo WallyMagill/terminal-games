@@ -2908,7 +2908,8 @@ git commit -m "feat: root model routing and program entry point"
 > `frameRows(h)` the renderer drops the topmost lines (margin, HUD, and
 > leading board rows) while the overlay is open. Accepted because the
 > overlay is transient, any key closes it, the board redraws intact
-> afterwards, and terminals taller than exact-fit show it whole.
+> afterwards, and terminals at least seven rows taller than exact-fit
+> show it whole.
 
 ---
 

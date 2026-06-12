@@ -339,7 +339,7 @@ func TestCorruptFileRecoversOnNextSave(t *testing.T) {
 // create — e.g. a user's manual backup before hand-editing scores.json,
 // the same hand-editing scenario Load's [0,999] sanitization defends
 // against — must never be touched, no matter how old. Kills the mutant
-// that widens the sweep glob from "scores-*.tmp" to "*.tmp".
+// that widens the sweep's name filter from scores-*.tmp to *.tmp.
 func TestSweepNeverDeletesForeignTempFiles(t *testing.T) {
 	s, path := tempStore(t)
 	dir := filepath.Dir(path)
