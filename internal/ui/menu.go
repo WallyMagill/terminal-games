@@ -168,27 +168,35 @@ func (m menuModel) View() string {
 	}
 	for i, p := range presets {
 		// Dims are padded to the widest preset ("30×16", 5 cols; × is one
-		// rune and one column) so the best: column lines up across rows.
+		// rune and one column) so the best: column lines up across rows —
+		// in both the full and the compact (≤ 30-col terminal) variants.
 		dims := fmt.Sprintf("%d×%d", p.Width, p.Height)
-		b.WriteString(m.menuRow(i, fmt.Sprintf("%-13s %-5s · %d mines  best: %s",
-			p.Name, dims, p.Mines, m.bestFor(p.Key))))
+		full := fmt.Sprintf("%-13s %-5s · %d mines  best: %s",
+			p.Name, dims, p.Mines, m.bestFor(p.Key))
+		compact := fmt.Sprintf("%-12s %-5s/%-2d %s",
+			p.Name, dims, p.Mines, m.bestFor(p.Key))
+		b.WriteString(m.menuRow(i, full, compact))
 	}
-	b.WriteString(m.menuRow(itemCustom, "Custom…"))
-	b.WriteString(m.menuRow(itemQuit, "Quit"))
-	b.WriteString("\n" + styleFaint.Render(" ↑↓ move · enter select"))
-	if m.err != "" {
-		b.WriteString("\n" + styleErr.Render(" "+m.err))
+	b.WriteString(m.menuRow(itemCustom, "Custom…", "Custom…"))
+	b.WriteString(m.menuRow(itemQuit, "Quit", "Quit"))
+	b.WriteString("\n" + styleFaint.Render(clampLine(" ↑↓ move · enter select", m.termW)))
+	for _, l := range wrapText(m.err, m.termW) {
+		b.WriteString("\n" + styleErr.Render(" "+l))
 	}
 	return b.String()
 }
 
-func (m menuModel) menuRow(i int, label string) string {
-	prefix := "   "
-	if m.cursor == i {
-		prefix = " > "
-		return styleHUD.Render(prefix+label) + "\n"
+// menuRow renders one list row, swapping in the compact label when the
+// full one cannot fit the terminal next to the 3-column cursor prefix.
+func (m menuModel) menuRow(i int, full, compact string) string {
+	label := full
+	if m.termW > 0 {
+		label = clampLine(fitLine(m.termW-3, full, compact), m.termW-3)
 	}
-	return prefix + label + "\n"
+	if m.cursor == i {
+		return styleHUD.Render(" > "+label) + "\n"
+	}
+	return "   " + label + "\n"
 }
 
 func (m menuModel) bestFor(key string) string {
@@ -209,9 +217,11 @@ func (m menuModel) formView() string {
 		}
 		b.WriteString(fmt.Sprintf(" %s %-7s %s\n", cursor, l+":", m.form.fields[i]))
 	}
-	b.WriteString("\n" + styleFaint.Render(" tab/enter next · enter on mines starts · esc back"))
-	if m.err != "" {
-		b.WriteString("\n" + styleErr.Render(" "+m.err))
+	b.WriteString("\n" + styleFaint.Render(fitLine(m.termW,
+		" tab/enter next · enter on mines starts · esc back",
+		" tab next · enter start · esc")))
+	for _, l := range wrapText(m.err, m.termW) {
+		b.WriteString("\n" + styleErr.Render(" "+l))
 	}
 	return b.String()
 }

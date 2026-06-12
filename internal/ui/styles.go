@@ -1,6 +1,10 @@
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // Cell glyphs are two columns wide so the board reads roughly square.
 const (
@@ -50,6 +54,37 @@ func allFit(lines []string, termW int) bool {
 		}
 	}
 	return true
+}
+
+// wrapText greedily word-wraps s for terminals termW columns wide, leaving
+// one column for the leading margin its callers prepend. Width 0 means the
+// size is unknown: no wrapping. An empty s wraps to no lines at all.
+func wrapText(s string, termW int) []string {
+	if s == "" {
+		return nil
+	}
+	if termW <= 0 {
+		return []string{s}
+	}
+	budget := max(termW-1, 1)
+	var lines []string
+	line := ""
+	for _, w := range strings.Fields(s) {
+		w = clampLine(w, budget)
+		switch {
+		case line == "":
+			line = w
+		case lipgloss.Width(line)+1+lipgloss.Width(w) <= budget:
+			line += " " + w
+		default:
+			lines = append(lines, line)
+			line = w
+		}
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 // clampLine hard-truncates a plain-text line to termW display columns. The

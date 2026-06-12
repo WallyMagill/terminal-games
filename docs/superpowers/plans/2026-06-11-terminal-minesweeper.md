@@ -2770,6 +2770,19 @@ git commit -m "feat: root model routing and program entry point"
 > rune clamp for terminals narrower than any variant — so the fallback
 > screen itself fits every terminal size, down to and below 10×2.
 
+> **Execution amendment (audit-driven):** the menu and custom form were the
+> last fixed-width screens (44-column preset rows, 50-column form hint) and
+> wrapped on 30–43-column terminals where the game itself plays. They now
+> adapt with the same `fitLine` mechanism as the game chrome: preset rows
+> swap to a ≤ 28-column aligned compact variant (`Beginner     9×9  /10
+> 003`), the form hint to `tab next · enter start · esc`, and validation
+> errors word-wrap to the terminal width (`wrapText`) instead of clipping,
+> so every word stays visible. Wide and unknown-size terminals keep the
+> original spacious layout byte-for-byte. Below the 30-column game floor
+> the menu stays navigable and degrades by clamping rather than adding a
+> separate menu-level too-small screen — it is short, textual, and every
+> row remains selectable.
+
 ---
 
 ### Task 15: Final verification
