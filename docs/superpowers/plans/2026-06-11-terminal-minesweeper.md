@@ -1338,6 +1338,31 @@ git commit -m "feat: atomic JSON best-times store with record-if-best"
 > pinned the no-stray-temp intent for the success path. The rename error
 > is still returned to the caller either way.
 
+> **Execution amendment (audit-driven):** `Save` creates a unique temp file
+> per call (`os.CreateTemp(dir, "scores-*.tmp")`, write, close, chmod
+> 0644, rename) instead of the fixed `path+".tmp"` sketched above. Every
+> process shares one `DefaultPath`, so with the fixed name two instances
+> (two terminal windows) saving concurrently interleaved truncate+write
+> cycles inside one shared temp inode, and the rename could promote a
+> hybrid of two payloads into `scores.json` — invalid JSON that the next
+> `Load` silently discarded, losing every recorded best. With a unique
+> temp per save the rename always promotes one writer's complete payload;
+> concurrent saves degrade to last-writer-wins, which is acceptable —
+> corruption is not. The cleanup-on-failed-rename behavior above now
+> removes the call's own temp file, and a successful save also sweeps
+> `scores-*.tmp` leftovers older than an hour — orphans of saves that died
+> between create and rename, which the fixed-name scheme self-healed by
+> reuse; the age threshold keeps the sweep from ever deleting a concurrent
+> process's in-flight temp. fsync remains deliberately omitted (crash
+> durability is the separately accepted tradeoff; this change is about
+> integrity under concurrency). `TestSaveLeavesNoTempFile` and
+> `TestSaveRenameFailureLeavesNoTempFile` now pin "no stray files" by
+> listing the directory instead of statting the old fixed name, and
+> `TestConcurrentSavesNeverCorruptScoresFile` pins the contract directly:
+> two stores hammering one path under `-race` with different-size payloads
+> must yield no save errors, no unparseable read, and a final file equal
+> to one writer's complete payload.
+
 ---
 
 ### Task 9: UI presets and styles

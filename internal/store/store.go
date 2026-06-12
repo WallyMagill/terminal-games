@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // Scores maps a preset key ("beginner", "intermediate", "expert") to the
@@ -51,24 +52,68 @@ func (s *Store) Load() Scores {
 	return sc
 }
 
-// Save writes scores atomically (temp file + rename).
+// Save writes scores atomically (temp file + rename). The temp file is
+// unique to this call: every process shares one scores path, so two
+// instances saving concurrently (two terminal windows) must never share a
+// temp file — interleaved writes into one shared temp could promote a
+// hybrid of two payloads. With a unique temp per call, concurrent saves
+// degrade to last-writer-wins and the promoted file is always one writer's
+// complete payload. The data is not fsynced before the rename: losing the
+// very last save to a crash is an accepted tradeoff for a scores file.
 func (s *Store) Save(sc Scores) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+	dir := filepath.Dir(s.path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(sc, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	f, err := os.CreateTemp(dir, "scores-*.tmp")
+	if err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, s.path); err != nil {
-		os.Remove(tmp) // best effort: don't orphan the temp file
-		return err
+	tmp := f.Name()
+	_, werr := f.Write(data)
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
 	}
+	if werr == nil {
+		// CreateTemp opens at 0600; keep the 0644 the store always wrote.
+		werr = os.Chmod(tmp, 0o644)
+	}
+	if werr == nil {
+		werr = os.Rename(tmp, s.path)
+	}
+	if werr != nil {
+		os.Remove(tmp) // best effort: don't orphan this save's temp file
+		return werr
+	}
+	s.sweepStaleTemps(dir)
 	return nil
+}
+
+// staleTempAge is how old an orphaned scores-*.tmp must be before a
+// successful Save removes it. A temp file only outlives its Save call when
+// the process dies between creating and renaming it; an hour is far beyond
+// any live save's lifetime, so the sweep can never delete a concurrent
+// process's in-flight temp file.
+const staleTempAge = time.Hour
+
+// sweepStaleTemps removes temp files orphaned by saves that died before
+// their rename (the old fixed-name scheme self-healed by reusing one name;
+// unique names need an explicit sweep). Best effort: the save itself has
+// already succeeded, so every error here is ignored.
+func (s *Store) sweepStaleTemps(dir string) {
+	matches, err := filepath.Glob(filepath.Join(dir, "scores-*.tmp"))
+	if err != nil {
+		return
+	}
+	for _, m := range matches {
+		if fi, err := os.Stat(m); err == nil && time.Since(fi.ModTime()) >= staleTempAge {
+			os.Remove(m)
+		}
+	}
 }
 
 // RecordIfBest saves secs under key if it beats the current best.
