@@ -154,3 +154,46 @@ func TestCoalescedNameLettersIgnoredInForm(t *testing.T) {
 		t.Error("real esc key must close the form")
 	}
 }
+
+// Pins isRuneBatch's exact boundary (len(msg.Runes) > 1, not > 2): "up" is
+// the only 2-rune string that collides with a key name at a whole-string
+// dispatch site (updateForm's `case "shift+tab", "up"`). A coalesced typed
+// batch u,p must hit the per-rune digit filter and be ignored, while the
+// real up-arrow key keeps navigating.
+func TestCoalescedUpLettersIgnoredInForm(t *testing.T) {
+	m := openForm(t, testMenu())
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("up")})
+	if m.form.active != 0 {
+		t.Errorf("letters u,p moved the active field to %d; a 2-rune batch must be ignored as non-digits",
+			m.form.active)
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.form.active != 2 {
+		t.Errorf("real up arrow: active = %d, want 2", m.form.active)
+	}
+}
+
+// Pins typedKeys' Alt condition: alt-modified runes pass through as their
+// Key.String() ("alt+j", "alt+q") and are ignored by the rune bindings.
+// Pressing Esc then a letter within one terminal read parses as alt+letter
+// (and Option-as-Meta terminals emit it for every alt+key), so an alt rune
+// dispatching as its bare letter would move cursors — or quit the app from
+// the menu list via alt+q.
+func TestAltModifiedRunesIgnoredByRuneBindings(t *testing.T) {
+	g := testGameModel(t)
+	g, _ = g.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j"), Alt: true})
+	if g.cursorY != 0 {
+		t.Errorf("alt+j moved the game cursor to y=%d; alt-modified runes must be ignored", g.cursorY)
+	}
+	m := testMenu()
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q"), Alt: true})
+	if cmd != nil {
+		if _, ok := cmd().(tea.QuitMsg); ok {
+			t.Error("alt+q quit from the menu list; alt-modified runes must be ignored")
+		}
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j"), Alt: true})
+	if m.cursor != 0 {
+		t.Errorf("alt+j moved the menu cursor to %d; alt-modified runes must be ignored", m.cursor)
+	}
+}
