@@ -391,6 +391,9 @@ func TestAppMenuKeysNotInterceptedByGameSwitch(t *testing.T) {
 	if a.view != viewMenu {
 		t.Errorf("view = %v, want viewMenu", a.view)
 	}
+	if got := a.menu.form.fields[0]; got != "9" {
+		t.Errorf("form width field = %q after esc, want the typed %q retained", got, "9")
+	}
 }
 
 func TestAppWinShowsBestTimeOnMenu(t *testing.T) {
