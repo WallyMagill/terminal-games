@@ -31,6 +31,68 @@ func TestAppTooSmallByHeightOnly(t *testing.T) {
 	}
 }
 
+// TestAppTooSmallScreenFitsHostileTerminals: the too-small screen is the
+// degraded-mode fallback — the screen shown BECAUSE the terminal is small
+// must itself fit ANY terminal that triggers it, including terminals
+// smaller than the screen's own full four-line footprint (20 cols, 6
+// rows). The frame-fit property below only probes needW-1/needH-1, which
+// never drops under 29×6, so the hostile range is pinned here.
+func TestAppTooSmallScreenFitsHostileTerminals(t *testing.T) {
+	for _, sz := range [][2]int{
+		{10, 2}, {19, 6}, {20, 5}, {25, 4}, {28, 10},
+		{10, 24}, {100, 2}, {9, 1},
+	} {
+		termW, termH := sz[0], sz[1]
+		t.Run(fmt.Sprintf("%dx%d", termW, termH), func(t *testing.T) {
+			a := NewApp(store.New(t.TempDir() + "/scores.json"))
+			a, _ = updApp(t, a, tea.WindowSizeMsg{Width: termW, Height: termH})
+			a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
+			v := a.View()
+			if !strings.Contains(v, "too small") {
+				t.Fatalf("%d×%d must trigger the guard for Beginner", termW, termH)
+			}
+			lines := strings.Split(v, "\n")
+			if len(lines) > termH {
+				t.Errorf("too-small screen is %d rows on a %d-row terminal:\n%s",
+					len(lines), termH, v)
+			}
+			for i, line := range lines {
+				if w := lipgloss.Width(line); w > termW {
+					t.Errorf("line %d is %d cols on a %d-col terminal: %q",
+						i, w, termW, line)
+				}
+			}
+		})
+	}
+}
+
+// Degradation must not shed payload while it still fits: at normal trigger
+// sizes the screen is byte-identical to the original four-line form, a
+// height-4 terminal keeps need/have by dropping only the blank margins,
+// and the 10×2 floor still names the state and the way out.
+func TestAppTooSmallDegradesByLineAndKeepsPayload(t *testing.T) {
+	a := testApp(t)
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]}) // Beginner: frame 30×14
+
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 28, Height: 10})
+	if v, want := a.View(), "\n Terminal too small.\n need 30×14\n have 28×10\n press m for menu.\n"; v != want {
+		t.Errorf("28×10 view = %q, want the full four-line form %q", v, want)
+	}
+
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 25, Height: 4})
+	v := a.View()
+	for _, want := range []string{"need 30×14", "have 25×4", "press m for menu."} {
+		if !strings.Contains(v, want) {
+			t.Errorf("25×4 view must keep %q:\n%s", want, v)
+		}
+	}
+
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 10, Height: 2})
+	if v, want := a.View(), "too small\nm: menu"; v != want {
+		t.Errorf("10×2 view = %q, want %q", v, want)
+	}
+}
+
 // TestAppFrameFitsWheneverGuardAccepts is the guard's contract as a
 // property: across board shapes and terminal sizes straddling the guard
 // boundary, an accepted terminal renders no line wider or frame taller

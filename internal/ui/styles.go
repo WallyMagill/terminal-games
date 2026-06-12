@@ -42,6 +42,30 @@ func fitLine(termW int, full, compact string) string {
 	return compact
 }
 
+// allFit reports whether every line fits termW columns.
+func allFit(lines []string, termW int) bool {
+	for _, l := range lines {
+		if lipgloss.Width(l) > termW {
+			return false
+		}
+	}
+	return true
+}
+
+// clampLine hard-truncates a plain-text line to termW display columns. The
+// degradation ladders pick variants that fit whole; this is the last-resort
+// floor for terminals narrower than any variant.
+func clampLine(s string, termW int) string {
+	if termW <= 0 || lipgloss.Width(s) <= termW {
+		return s
+	}
+	r := []rune(s)
+	for len(r) > 0 && lipgloss.Width(string(r)) > termW {
+		r = r[:len(r)-1]
+	}
+	return string(r)
+}
+
 // Classic Windows minesweeper number palette.
 var numberStyles = map[int]lipgloss.Style{
 	1: lipgloss.NewStyle().Foreground(lipgloss.Color("12")), // blue

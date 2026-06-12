@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -102,14 +103,49 @@ func (a App) View() string {
 		return "\n" + a.menu.View() + "\n"
 	}
 	if a.gameTooSmall() {
-		// Stacked and short so it fits every terminal that triggers it
-		// (longest line 20 columns, 6 rows including margins).
-		return fmt.Sprintf(
-			"\n Terminal too small.\n need %d×%d\n have %d×%d\n press m for menu.\n",
-			frameCols(a.game.game.Width()), frameRows(a.game.game.Height()),
-			a.termW, a.termH)
+		return a.tooSmallView()
 	}
 	return "\n" + a.game.View() + "\n"
+}
+
+// tooSmallView renders the guard screen with progressive degradation so the
+// fallback itself fits every terminal that can trigger it: the full stacked
+// form when it fits, the payload lines without margins under height
+// pressure, compact variants under width pressure, and a two-line floor
+// below that. A final clamp covers terminals narrower than any variant.
+func (a App) tooSmallView() string {
+	needW, needH := frameCols(a.game.game.Width()), frameRows(a.game.game.Height())
+	full := []string{
+		"",
+		" Terminal too small.",
+		fmt.Sprintf(" need %d×%d", needW, needH),
+		fmt.Sprintf(" have %d×%d", a.termW, a.termH),
+		" press m for menu.",
+		"",
+	}
+	compact := []string{
+		"too small",
+		fmt.Sprintf("need %d×%d", needW, needH),
+		fmt.Sprintf("have %d×%d", a.termW, a.termH),
+		"m: menu",
+	}
+	var lines []string
+	switch {
+	case allFit(full, a.termW) && len(full) <= a.termH:
+		lines = full
+	case allFit(full[1:5], a.termW) && len(full)-2 <= a.termH:
+		lines = full[1:5]
+	case allFit(compact, a.termW) && len(compact) <= a.termH:
+		lines = compact
+	case a.termH >= 2:
+		lines = []string{compact[0], compact[3]}
+	default:
+		lines = compact[:1]
+	}
+	for i, l := range lines {
+		lines[i] = clampLine(l, a.termW)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // gameTooSmall reports whether the active game's full frame — board plus

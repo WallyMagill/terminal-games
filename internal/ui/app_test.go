@@ -231,8 +231,11 @@ func TestAppTooSmallNeedDimsAccurate(t *testing.T) {
 	}
 }
 
-// The too-small screen says "press m for menu"; the first m must obey even
-// if the help overlay was open (and hidden) when the terminal shrank.
+// The too-small screen advertises the m key; the first m must obey even
+// if the help overlay was open (and hidden) when the terminal shrank. On a
+// 10-column terminal the full "press m for menu." line cannot fit, so the
+// screen degrades it to the compact "m: menu" hint (audit round 2: the
+// fallback must itself fit any terminal that triggers it).
 func TestAppTooSmallFirstMOpensMenuDespiteHelp(t *testing.T) {
 	a := testApp(t)
 	model, _ := a.Update(startGameMsg{preset: presets[0]})
@@ -241,8 +244,8 @@ func TestAppTooSmallFirstMOpensMenuDespiteHelp(t *testing.T) {
 	a = model.(App)
 	model, _ = a.Update(tea.WindowSizeMsg{Width: 10, Height: 5})
 	a = model.(App)
-	if !strings.Contains(a.View(), "press m for menu") {
-		t.Fatal("expected the too-small instruction")
+	if !strings.Contains(a.View(), "m: menu") {
+		t.Fatal("expected the too-small m hint")
 	}
 	model, _ = a.Update(key("m"))
 	a = model.(App)

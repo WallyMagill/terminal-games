@@ -2760,6 +2760,16 @@ git commit -m "feat: root model routing and program entry point"
 > overlay, and all keys except m/esc/q are ignored while it shows — the
 > advertised "press m for menu" now always works on the first press.
 
+> **Execution amendment (audit-driven):** the four-line too-small screen
+> still overflowed terminals smaller than its own footprint (under 20
+> columns or 6 rows). `App.tooSmallView` now degrades progressively: the
+> full stacked form when it fits, the four payload lines without blank
+> margins under height pressure, compact variants (`too small` / `need
+> W×H` / `have W×H` / `m: menu`) under width pressure, a two-line floor
+> (`too small` / `m: menu`) at two rows, a single line at one, and a hard
+> rune clamp for terminals narrower than any variant — so the fallback
+> screen itself fits every terminal size, down to and below 10×2.
+
 ---
 
 ### Task 15: Final verification
