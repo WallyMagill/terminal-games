@@ -1363,6 +1363,17 @@ git commit -m "feat: atomic JSON best-times store with record-if-best"
 > must yield no save errors, no unparseable read, and a final file equal
 > to one writer's complete payload.
 
+> **Execution amendment (audit-driven):** the sweep above no longer uses
+> `filepath.Glob`: a glob pattern built by embedding the directory path
+> treats metacharacters in the config dir's own name (e.g. a parent named
+> `cfg [backup]` — a valid character class) as pattern syntax and silently
+> matches nothing, leaving orphans to accumulate forever in such dirs.
+> `sweepStaleTemps` now lists the directory with `os.ReadDir` and matches
+> entry NAMES against the `scores-` prefix and `.tmp` suffix; scope and
+> age behavior are unchanged and remain pinned by
+> `TestSweepNeverDeletesForeignTempFiles`, the fresh-vs-stale pin, and the
+> new `TestSweepWorksInGlobMetacharacterDir`.
+
 ---
 
 ### Task 9: UI presets and styles

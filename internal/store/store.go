@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -104,16 +105,24 @@ const staleTempAge = time.Hour
 
 // sweepStaleTemps removes temp files orphaned by saves that died before
 // their rename (the old fixed-name scheme self-healed by reusing one name;
-// unique names need an explicit sweep). Best effort: the save itself has
-// already succeeded, so every error here is ignored.
+// unique names need an explicit sweep). Matching is on directory-entry
+// names — a path glob would treat metacharacters in the config dir's own
+// name (e.g. "cfg [backup]") as pattern syntax and silently match nothing.
+// Best effort: the save itself has already succeeded, so every error here
+// is ignored.
 func (s *Store) sweepStaleTemps(dir string) {
-	matches, err := filepath.Glob(filepath.Join(dir, "scores-*.tmp"))
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
 	}
-	for _, m := range matches {
-		if fi, err := os.Stat(m); err == nil && time.Since(fi.ModTime()) >= staleTempAge {
-			os.Remove(m)
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasPrefix(name, "scores-") || !strings.HasSuffix(name, ".tmp") {
+			continue
+		}
+		p := filepath.Join(dir, name)
+		if fi, err := os.Stat(p); err == nil && time.Since(fi.ModTime()) >= staleTempAge {
+			os.Remove(p)
 		}
 	}
 }

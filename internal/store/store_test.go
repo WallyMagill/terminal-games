@@ -371,3 +371,31 @@ func TestSweepNeverDeletesForeignTempFiles(t *testing.T) {
 		}
 	}
 }
+
+// The sweep must work regardless of what the config dir is named: a glob
+// built by embedding the directory path treats characters like "[" in the
+// dir name as pattern syntax and silently matches nothing, leaving orphans
+// to accumulate forever. Matching must be on entry names, not a path glob.
+func TestSweepWorksInGlobMetacharacterDir(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "cfg [backup]", "mines")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "scores.json")
+	stale := filepath.Join(dir, "scores-orphan1.tmp")
+	if err := os.WriteFile(stale, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.New(path).Save(store.Scores{"beginner": 4}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("stale temp %q survived a successful save in a metacharacter dir", stale)
+	}
+}
