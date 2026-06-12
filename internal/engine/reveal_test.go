@@ -133,6 +133,49 @@ func TestHitMineCoordinatesNotTransposed(t *testing.T) {
 	}
 }
 
+// Audit finding (round 3): every committed test queries HitMine only after a
+// loss, so a mutant hardcoding the ok result to true (board.go HitMine:
+// `return g.hitX, g.hitY, g.mineHit` -> `return g.hitX, g.hitY, true`)
+// survives the entire repo suite. HitMine's contract is that ok is false
+// until a mine actually ends the game — including before the first reveal,
+// during play, and after a WIN.
+func TestHitMineNotOKWithoutALoss(t *testing.T) {
+	// Fresh, unstarted game.
+	g, err := New(4, 4, 2, testRNG())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if x, y, ok := g.HitMine(); ok {
+		t.Errorf("HitMine = (%d,%d,%v) before any reveal, want ok=false", x, y, ok)
+	}
+
+	// Mid-game: a safe reveal on a known board.
+	g = newWithMines(t, 4, 4, [][2]int{{0, 0}, {2, 2}})
+	g.Reveal(3, 0) // zero region top-right, safe
+	if g.Status() != Playing {
+		t.Fatalf("status = %v, want Playing", g.Status())
+	}
+	if x, y, ok := g.HitMine(); ok {
+		t.Errorf("HitMine = (%d,%d,%v) while playing, want ok=false", x, y, ok)
+	}
+
+	// Won game: reveal every safe cell.
+	for y := 0; y < 4; y++ {
+		for x := 0; x < 4; x++ {
+			if (x == 0 && y == 0) || (x == 2 && y == 2) {
+				continue
+			}
+			g.Reveal(x, y)
+		}
+	}
+	if g.Status() != Won {
+		t.Fatalf("status = %v, want Won", g.Status())
+	}
+	if x, y, ok := g.HitMine(); ok {
+		t.Errorf("HitMine = (%d,%d,%v) after a win, want ok=false", x, y, ok)
+	}
+}
+
 func TestRevealEdgeCases(t *testing.T) {
 	g := cornerBoard(t)
 	g.CycleFlag(1, 1)
