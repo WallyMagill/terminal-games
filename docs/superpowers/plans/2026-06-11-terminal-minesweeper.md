@@ -2857,13 +2857,14 @@ git commit -m "feat: root model routing and program entry point"
 > previous thresholds (all-full from 42 columns with no times recorded,
 > from 44 with all recorded; wide and unknown-size terminals unchanged).
 
-> **Execution amendment (audit-driven):** the claim two amendments above
-> that below the 30-column game floor the menu "degrades by clamping"
-> overstated what the code does; this corrects the record rather than the
-> code. Only the menu list rows are clamped (`clampLine` to the budget
-> left of the 3-column cursor prefix), and only while that budget is
-> positive — at a known width of 3 columns or fewer the budget hits the
-> `termW <= 0` "size unknown" sentinels and the rows pass through whole.
+> **Execution amendment (audit-driven):** the claim three amendments above
+> (in the menu/form width-adaptation amendment) that below the 30-column
+> game floor the menu "degrades by clamping" overstated what the code
+> does; this corrects the record rather than the code. Only the menu
+> list rows are clamped (`clampLine` to the budget left of the 3-column
+> cursor prefix), and only while that budget is positive — at a known
+> width of 3 columns or fewer the budget hits the `termW <= 0` "size
+> unknown" sentinels and the rows pass through whole.
 > The ` MINES` title, the custom form's header and field rows (≤ 14
 > columns), and the form hint (which only swaps to its 29-column compact
 > variant via `fitLine`, never clamps) are not clamped at all, so the
