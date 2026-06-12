@@ -201,6 +201,36 @@ func TestAppTooSmallMessageFitsTrigger(t *testing.T) {
 	}
 }
 
+// Before the first WindowSizeMsg the terminal size is unknown (0×0); the
+// game must render optimistically rather than claim "too small … have 0×0".
+func TestAppZeroSizeRendersGameOptimistically(t *testing.T) {
+	a := NewApp(store.New(t.TempDir() + "/scores.json"))
+	a, _ = updApp(t, a, startGameMsg{preset: presets[2]}) // Expert, before any size is known
+	v := a.View()
+	if strings.Contains(v, "too small") {
+		t.Error("unknown terminal size must render the game, not the too-small screen")
+	}
+	if !strings.Contains(v, "🚩") {
+		t.Error("zero-size render must still show the game HUD")
+	}
+}
+
+// The need-dims line is the too-small screen's sole actionable payload; it
+// must report the frame as width×height, matching the adjacent "have" line —
+// swapped numbers would send the user resizing to the wrong shape.
+func TestAppTooSmallNeedDimsAccurate(t *testing.T) {
+	a := testApp(t)
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]}) // Beginner: frame 30×14
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 10, Height: 5})
+	v := a.View()
+	if !strings.Contains(v, "need 30×14") {
+		t.Errorf("too-small screen must state the needed frame 30×14:\n%s", v)
+	}
+	if !strings.Contains(v, "have 10×5") {
+		t.Errorf("too-small screen must state the current size 10×5:\n%s", v)
+	}
+}
+
 // The too-small screen says "press m for menu"; the first m must obey even
 // if the help overlay was open (and hidden) when the terminal shrank.
 func TestAppTooSmallFirstMOpensMenuDespiteHelp(t *testing.T) {
