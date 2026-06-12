@@ -93,6 +93,39 @@ func TestAppTooSmallDegradesByLineAndKeepsPayload(t *testing.T) {
 	}
 }
 
+// TestAppTooSmallHeightThreeFallsToFloor pins the height bound of the
+// four-line arm: height 3 is one row too short for the four payload
+// lines, so the ladder must fall past them to a form that fits three
+// rows. Kills the mutant relaxing `len(full)-2 <= termH` to
+// `len(full)-3 <= termH`, which renders four lines on a 3-row terminal.
+func TestAppTooSmallHeightThreeFallsToFloor(t *testing.T) {
+	a := NewApp(store.New(t.TempDir() + "/scores.json"))
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 25, Height: 3})
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
+	v := a.View()
+	if !strings.Contains(v, "too small") {
+		t.Fatal("25×3 must trigger the too-small screen for Beginner")
+	}
+	if n := len(strings.Split(v, "\n")); n > 3 {
+		t.Errorf("too-small screen is %d lines on a 3-row terminal:\n%s", n, v)
+	}
+}
+
+// TestAppTooSmallFloorClampsBelowNineCols: on terminals narrower than the
+// narrowest variant ("too small", 9 cols) no ladder arm fits whole, and
+// only the final hard clamp keeps the floor lines inside the terminal.
+// Kills the mutant that deletes tooSmallView's clamp loop.
+func TestAppTooSmallFloorClampsBelowNineCols(t *testing.T) {
+	a := NewApp(store.New(t.TempDir() + "/scores.json"))
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 5, Height: 2})
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
+	for i, line := range strings.Split(a.View(), "\n") {
+		if w := lipgloss.Width(line); w > 5 {
+			t.Errorf("line %d is %d cols on a 5-col terminal: %q", i, w, line)
+		}
+	}
+}
+
 // TestAppFrameFitsWheneverGuardAccepts is the guard's contract as a
 // property: across board shapes and terminal sizes straddling the guard
 // boundary, an accepted terminal renders no line wider or frame taller
