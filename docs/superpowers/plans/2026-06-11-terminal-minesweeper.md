@@ -2809,6 +2809,17 @@ git commit -m "feat: root model routing and program entry point"
 > separate menu-level too-small screen — it is short, textual, and every
 > row remains selectable.
 
+> **Execution amendment (audit-driven):** the previous amendment's "every
+> word stays visible" did not hold for words wider than the wrap budget:
+> `wrapText` ran each word through `clampLine`, rune-truncating it — the
+> real `engine.ErrMineCount` message rendered its rule content
+> `width*height-2` as `width*hei` on terminals 14 columns or narrower.
+> Over-budget words now hard-break into budget-sized chunks across
+> consecutive lines, so the full message is always reconstructible from
+> the rendered lines and no characters are lost; words that fit wrap
+> exactly as before, and a double-width rune that can never fit a 1-column
+> budget is emitted whole rather than dropped.
+
 ---
 
 ### Task 15: Final verification

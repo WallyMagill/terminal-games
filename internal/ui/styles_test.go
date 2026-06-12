@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/wallymagill/mines/internal/store"
 )
 
@@ -57,5 +58,44 @@ func TestWrapTextReservesMarginColumn(t *testing.T) {
 	want := []string{"ab", "cd"}
 	if !slices.Equal(got, want) {
 		t.Errorf("wrapText(\"ab cd\", 5) = %q, want %q", got, want)
+	}
+}
+
+// Audit round 3 (finding 6): wrapText rune-truncated words wider than the
+// line budget, so the engine message word "width*height-2" lost its "-2"
+// tail on terminals 14 columns or narrower. Over-budget words must
+// hard-break into budget-sized chunks across consecutive lines instead:
+// every line fits, no line is empty, and joining the lines reconstructs
+// every original word with no characters lost.
+func TestWrapTextHardBreaksOverlongWords(t *testing.T) {
+	const msg = "use abcdefghijklmnopqrstuvwxyz then stop"
+	for _, termW := range []int{10, 12} {
+		lines := wrapText(msg, termW)
+		for i, l := range lines {
+			if w := lipgloss.Width(l); w > termW-1 {
+				t.Errorf("termW=%d: line %d is %d cols, budget %d: %q",
+					termW, i, w, termW-1, l)
+			}
+			if l == "" {
+				t.Errorf("termW=%d: line %d is empty", termW, i)
+			}
+		}
+		joined := strings.Join(lines, "")
+		for _, w := range strings.Fields(msg) {
+			if !strings.Contains(joined, w) {
+				t.Errorf("termW=%d: word %q not reconstructible from %q",
+					termW, w, lines)
+			}
+		}
+	}
+}
+
+// A double-width rune at budget 1 can never fit a chunk; it must still be
+// emitted whole (one rune per line) rather than looping or vanishing.
+func TestWrapTextWideRuneAtUnitBudget(t *testing.T) {
+	got := wrapText("中中", 2)
+	want := []string{"中", "中"}
+	if !slices.Equal(got, want) {
+		t.Errorf("wrapText(\"中中\", 2) = %q, want %q", got, want)
 	}
 }

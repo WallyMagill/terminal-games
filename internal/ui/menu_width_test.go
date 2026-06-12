@@ -58,6 +58,29 @@ func TestMenuKeepsFullFormatWhenWide(t *testing.T) {
 	}
 }
 
+// Audit round 3 (finding 6): the real engine.ErrMineCount text contains
+// the 14-column word "width*height-2"; on a 10-column terminal the old
+// per-word truncation rendered it "width*hei", silently dropping the "-2"
+// rule content. Long words must hard-break across lines, so joining the
+// rendered fields without separators reconstructs every original word.
+func TestFormErrorWordsSurviveHardWrapAtWidthTen(t *testing.T) {
+	m := newMenuModel(store.Scores{}, 10, 24)
+	m.showForm = true
+	m.form.fields = [3]string{"5", "5", "99"}
+	_, err := m.form.preset(10, 24)
+	if err == nil {
+		t.Fatal("expected ErrMineCount for a 5×5 board with 99 mines")
+	}
+	m.err = err.Error()
+	v := m.View()
+	joined := strings.Join(strings.Fields(v), "")
+	for _, w := range strings.Fields(err.Error()) {
+		if !strings.Contains(joined, w) {
+			t.Errorf("error word %q lost at width 10:\n%s", w, v)
+		}
+	}
+}
+
 // A validation message longer than the terminal is word-wrapped, not
 // clipped: every word survives somewhere on screen.
 func TestFormErrorWrapsVisiblyAtNarrowWidth(t *testing.T) {

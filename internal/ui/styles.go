@@ -57,8 +57,10 @@ func allFit(lines []string, termW int) bool {
 }
 
 // wrapText greedily word-wraps s for terminals termW columns wide, leaving
-// one column for the leading margin its callers prepend. Width 0 means the
-// size is unknown: no wrapping. An empty s wraps to no lines at all.
+// one column for the leading margin its callers prepend. A word wider than
+// the budget hard-breaks into budget-sized chunks across consecutive lines
+// — no characters are lost. Width 0 means the size is unknown: no
+// wrapping. An empty s wraps to no lines at all.
 func wrapText(s string, termW int) []string {
 	if s == "" {
 		return nil
@@ -70,8 +72,20 @@ func wrapText(s string, termW int) []string {
 	var lines []string
 	line := ""
 	for _, w := range strings.Fields(s) {
-		w = clampLine(w, budget)
+		for lipgloss.Width(w) > budget {
+			if line != "" {
+				lines = append(lines, line)
+				line = ""
+			}
+			head := clampLine(w, budget)
+			if head == "" { // a single rune wider than the budget
+				head = string([]rune(w)[:1])
+			}
+			lines = append(lines, head)
+			w = string([]rune(w)[len([]rune(head)):])
+		}
 		switch {
+		case w == "": // word consumed whole by the chunk loop
 		case line == "":
 			line = w
 		case lipgloss.Width(line)+1+lipgloss.Width(w) <= budget:
