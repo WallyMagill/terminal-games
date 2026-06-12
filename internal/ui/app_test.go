@@ -49,6 +49,24 @@ func testApp(t *testing.T) App {
 	return model.(App)
 }
 
+// updApp routes msg through App.Update and re-asserts the concrete type.
+func updApp(t *testing.T, a App, msg tea.Msg) (App, tea.Cmd) {
+	t.Helper()
+	model, cmd := a.Update(msg)
+	return model.(App), cmd
+}
+
+// boardLines extracts the rendered board rows from an App game view: the
+// leading margin (1), HUD (1) and blank line (1) precede the board.
+func boardLines(t *testing.T, v string, boardH int) []string {
+	t.Helper()
+	lines := strings.Split(v, "\n")
+	if len(lines) < 3+boardH {
+		t.Fatalf("view has %d lines, need at least %d:\n%s", len(lines), 3+boardH, v)
+	}
+	return lines[3 : 3+boardH]
+}
+
 func TestAppStartsOnMenu(t *testing.T) {
 	a := testApp(t)
 	if !strings.Contains(a.View(), "Beginner") {
@@ -220,6 +238,70 @@ func TestAppTooSmallIgnoresGameKeys(t *testing.T) {
 	a = model.(App)
 	if a.view != viewMenu {
 		t.Error("m while too small must return to the menu")
+	}
+}
+
+// A mid-game WindowSizeMsg must thread the new width into the game model:
+// compact-chrome switching depends on it, and a stale width keeps rendering
+// the 77-col full key hint, which bubbletea hard-truncates on a narrow
+// terminal. The startGameMsg path threads termW separately and is covered
+// above; this pins the mid-game resize path.
+func TestAppResizeMidGameAdaptsChrome(t *testing.T) {
+	a := testApp(t) // 120×40
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
+	if !strings.Contains(a.View(), "q quit") {
+		t.Fatal("wide terminal must show the full key hint")
+	}
+	wideBoard := boardLines(t, a.View(), presets[0].Height)
+
+	// Shrink mid-game to the narrowest accepted width (Beginner needs 30×14).
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 30, Height: 20})
+	if a.game.termW != 30 {
+		t.Errorf("mid-game resize: game.termW = %d, want 30 (stale width keeps full chrome)", a.game.termW)
+	}
+	v := a.View()
+	if strings.Contains(v, "too small") {
+		t.Fatal("30×20 must be accepted for Beginner")
+	}
+	if strings.Contains(v, "q quit") {
+		t.Error("30-col terminal must swap to the compact hint")
+	}
+	for _, line := range strings.Split(v, "\n") {
+		if w := lipgloss.Width(line); w > 30 {
+			t.Errorf("line is %d cols on an accepted 30-col terminal (bubbletea will truncate): %q", w, line)
+		}
+	}
+	if got := boardLines(t, v, presets[0].Height); strings.Join(got, "\n") != strings.Join(wideBoard, "\n") {
+		t.Error("board content changed across a resize; model state must be size-independent")
+	}
+
+	// Grow back: full chrome returns, board still identical.
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 120, Height: 40})
+	if !strings.Contains(a.View(), "q quit") {
+		t.Error("growing back must restore the full key hint")
+	}
+	if got := boardLines(t, a.View(), presets[0].Height); strings.Join(got, "\n") != strings.Join(wideBoard, "\n") {
+		t.Error("board content changed across a resize round trip")
+	}
+}
+
+// The help-clear on resize is scoped to entering the too-small state; an
+// ordinary resize that still fits the game must leave an open overlay alone
+// (the overlay's contract is "any key to close help", and a WindowSizeMsg is
+// not a key).
+func TestAppResizeWhileHelpOpenKeepsOverlay(t *testing.T) {
+	a := testApp(t)
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
+	a, _ = updApp(t, a, key("?"))
+	if !a.game.showHelp {
+		t.Fatal("? must open help")
+	}
+	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 100, Height: 35})
+	if !a.game.showHelp {
+		t.Error("a resize that still fits the game must not close the help overlay")
+	}
+	if !strings.Contains(a.View(), "any key to close help") {
+		t.Error("help overlay must still be rendered after a still-fitting resize")
 	}
 }
 
