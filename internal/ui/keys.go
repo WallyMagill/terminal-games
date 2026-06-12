@@ -25,3 +25,15 @@ func typedKeys(msg tea.KeyMsg) []string {
 	}
 	return keys
 }
+
+// isRuneBatch reports whether msg is a coalesced multi-rune KeyRunes message
+// (typed batch or paste). Key.String() of a non-paste KeyRunes is its raw
+// runes, so a typed run spelling a special key's NAME — "esc", "tab",
+// "enter", "ctrl+c" — stringifies byte-identically to that key. Sites that
+// switch on the whole msg.String() must skip batches and let them fall
+// through to per-rune dispatch (typedKeys) or the form's digit filter; real
+// special keys are never KeyRunes and a single rune cannot spell a
+// multi-character name, so every legitimate key keeps working.
+func isRuneBatch(msg tea.KeyMsg) bool {
+	return msg.Type == tea.KeyRunes && len(msg.Runes) > 1
+}

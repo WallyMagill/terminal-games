@@ -1739,6 +1739,22 @@ git commit -m "feat: game model with cursor, key routing, and timer start"
 > part of a rune run), and a coalesced `m`/`q` inside a batch reaches the
 > focused view, which ignores it — a deliberate non-goal of this fix.
 
+> **Execution amendment (audit-driven):** the previous amendment's premise
+> that App-level interception could keep comparing the whole message —
+> "esc/ctrl+c are never part of a rune run" — was true of the KEYS (control
+> bytes break the parser's rune loop) but false of their `String()` NAMES: a
+> non-paste multi-rune `KeyRunes` stringifies to its raw runes, so typed
+> letters spelling a key name (`"esc"`, `"ctrl+c"`) are byte-identical to the
+> real key's `Key.String()`. A batched `"esc"` therefore matched
+> `case "m", "esc"` and permanently abandoned a running game to the menu (no
+> resume path), and a batched `"ctrl+c"` quit the app. Whole-string sites now
+> read `msg.String()` as a key name only when the message cannot be a
+> coalesced run (`isRuneBatch` in `keys.go`: `Type == KeyRunes` and more than
+> one rune); batches fall through to the focused view's per-rune `typedKeys`
+> dispatch, where unbound letters are ignored individually. Real special
+> keys (never `KeyRunes`) and single-rune `m`/`q` are unchanged, and a
+> batched `m`/`q` still reaches the focused view per rune as before.
+
 ---
 
 ### Task 11: Game model — timer ticks and best-time recording
@@ -2495,6 +2511,16 @@ git commit -m "feat: menu with presets, best times, validated custom form"
 > unaffected (it filters `msg.Runes` itself, per the amendment above) and
 > cannot open mid-batch: only enter/space open it, and the parser never
 > coalesces those into a rune run.
+
+> **Execution amendment (audit-driven):** `updateForm`'s whole-string switch
+> had the same key-name collision as the App interception (see the Task 10
+> amendment): a non-paste `KeyRunes` batch stringifies to its raw runes, so
+> letter runs spelling `"tab"`/`"down"`/`"up"` moved the active field,
+> `"esc"` closed the form discarding input, and `"enter"` submitted — instead
+> of being ignored as non-digits per the form rule. Multi-rune `KeyRunes`
+> messages (which carry only typed text or pastes, never key names) now
+> route straight to the per-rune digit filter, extracted as `formTyped`.
+> Real tab/esc/enter keys and single-rune input are unchanged.
 
 ---
 

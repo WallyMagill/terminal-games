@@ -68,3 +68,89 @@ func TestPastedRunesInertOnMenu(t *testing.T) {
 			"jj", m.cursor)
 	}
 }
+
+// A non-paste multi-rune KeyRunes stringifies to its raw runes, so a typed
+// batch spelling a special key's NAME — "esc", "tab", "enter", "ctrl+c" — is
+// byte-identical to that key's Key.String(). Whole-string dispatch sites
+// must never interpret a batch as a key name: per the project rule a
+// multi-rune typed message behaves exactly as if each character were typed.
+// Real special keys are never KeyRunes, and a single rune cannot spell a
+// multi-character name, so guarding batches changes nothing legitimate.
+
+func TestCoalescedEscLettersDoNotAbandonGame(t *testing.T) {
+	a := testApp(t)
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
+	a, _ = updApp(t, a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("esc")})
+	if a.view != viewGame {
+		t.Errorf("coalesced letters e,s,c abandoned the game (view = %v); per rune: e,s ignored, c chords",
+			a.view)
+	}
+}
+
+func TestCoalescedCtrlCLettersDoNotQuit(t *testing.T) {
+	a := testApp(t)
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
+	_, cmd := a.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("ctrl+c")})
+	if cmd != nil {
+		if _, ok := cmd().(tea.QuitMsg); ok {
+			t.Error("letters c,t,r,l,+,c quit the app; per rune they are ordinary input")
+		}
+	}
+}
+
+// Batches containing the bindable single letters m/q still fall through to
+// the focused view per rune, exactly as the round-2 amendment promises: the
+// bound runes around them act, and the game view ignores m/q individually.
+func TestCoalescedBoundLettersStillDispatchPerRune(t *testing.T) {
+	a := testApp(t)
+	a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
+	a, _ = updApp(t, a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("jm")})
+	if a.view != viewGame {
+		t.Errorf("batched m abandoned the game (view = %v); batches dispatch per rune", a.view)
+	}
+	if a.game.cursorY != 1 {
+		t.Errorf("cursorY = %d, want 1 — the j in a batch must still act", a.game.cursorY)
+	}
+	var cmd tea.Cmd
+	a, cmd = updApp(t, a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("qq")})
+	if cmd != nil {
+		if _, ok := cmd().(tea.QuitMsg); ok {
+			t.Error("batched q quit the app; the game view ignores q per rune")
+		}
+	}
+	if a.view != viewGame {
+		t.Errorf("batched qq left the game view (view = %v)", a.view)
+	}
+}
+
+// In the custom form, letter runs spelling key names must hit the per-rune
+// digit filter (non-digits ignored) — not navigate, submit, or close — while
+// the real enter/tab/esc keys keep their bindings.
+func TestCoalescedNameLettersIgnoredInForm(t *testing.T) {
+	m := openForm(t, testMenu())
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("tab")})
+	if m.form.active != 0 {
+		t.Errorf("letters t,a,b advanced the form field to %d; non-digits must be ignored", m.form.active)
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("enter")})
+	if m.form.active != 0 {
+		t.Errorf("letters e,n,t,e,r advanced the form field to %d; non-digits must be ignored", m.form.active)
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("esc")})
+	if !m.showForm {
+		t.Fatal("letters e,s,c closed the form; non-digits must be ignored")
+	}
+	// The real keys are not KeyRunes and keep working.
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.form.active != 1 {
+		t.Errorf("real enter key: active = %d, want 1", m.form.active)
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if m.form.active != 2 {
+		t.Errorf("real tab key: active = %d, want 2", m.form.active)
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.showForm {
+		t.Error("real esc key must close the form")
+	}
+}

@@ -93,6 +93,12 @@ type customForm struct {
 func newCustomForm() customForm { return customForm{} }
 
 func (m menuModel) updateForm(keyMsg tea.KeyMsg) (menuModel, tea.Cmd) {
+	// A coalesced rune run can spell a key NAME ("tab", "esc", "enter") and
+	// would match the switch below (see isRuneBatch). Batches carry only
+	// typed text or pastes, so route them straight to the digit filter.
+	if isRuneBatch(keyMsg) {
+		return m.formTyped(keyMsg), nil
+	}
 	switch keyMsg.String() {
 	case "esc":
 		m.showForm = false
@@ -120,21 +126,27 @@ func (m menuModel) updateForm(keyMsg tea.KeyMsg) (menuModel, tea.Cmd) {
 		m.err = ""
 		return m, startGame(p)
 	default:
-		// Pastes and coalesced fast typing arrive as one multi-rune KeyRunes
-		// msg, and Key.String() wraps bracketed pastes in brackets ("[5]"),
-		// so filter msg.Runes directly: each rune is treated exactly as if
-		// typed — digits append up to the 3-char cap, non-digits are ignored.
-		if keyMsg.Type != tea.KeyRunes || keyMsg.Alt {
-			break
-		}
-		for _, r := range keyMsg.Runes {
-			if r >= '0' && r <= '9' && len(m.form.fields[m.form.active]) < 3 {
-				m.form.fields[m.form.active] += string(r)
-				m.err = ""
-			}
-		}
+		return m.formTyped(keyMsg), nil
 	}
 	return m, nil
+}
+
+// formTyped applies typed or pasted input to the active form field. Both
+// arrive as KeyRunes messages, and Key.String() wraps bracketed pastes in
+// brackets ("[5]"), so filter msg.Runes directly: each rune is treated
+// exactly as if typed — digits append up to the 3-char cap, non-digits are
+// ignored.
+func (m menuModel) formTyped(keyMsg tea.KeyMsg) menuModel {
+	if keyMsg.Type != tea.KeyRunes || keyMsg.Alt {
+		return m
+	}
+	for _, r := range keyMsg.Runes {
+		if r >= '0' && r <= '9' && len(m.form.fields[m.form.active]) < 3 {
+			m.form.fields[m.form.active] += string(r)
+			m.err = ""
+		}
+	}
+	return m
 }
 
 // preset validates the form. Rule checks are delegated to engine.New (DRY);

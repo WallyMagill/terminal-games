@@ -66,11 +66,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.view = viewGame
 		return a, nil
 	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
-			return a, tea.Quit
-		}
-		if a.view == viewGame {
-			if !a.game.showHelp {
+		// msg.String() may only be read as a key NAME when the message
+		// cannot be a coalesced rune run (see isRuneBatch): typed letters
+		// spelling "esc" or "ctrl+c" stringify identically to those keys.
+		// Batches skip the name switches and reach the focused view, which
+		// dispatches them per rune.
+		if !isRuneBatch(msg) {
+			if msg.String() == "ctrl+c" {
+				return a, tea.Quit
+			}
+			if a.view == viewGame && !a.game.showHelp {
 				switch msg.String() {
 				case "m", "esc":
 					a.view = viewMenu
@@ -81,12 +86,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return a, tea.Quit
 				}
 			}
-			if a.gameTooSmall() {
-				// Only the menu/quit keys above act while the too-small
-				// screen is up: other keys must not mutate the invisible
-				// game (e.g. ? re-opening the overlay it just replaced).
-				return a, nil
-			}
+		}
+		if a.view == viewGame && a.gameTooSmall() {
+			// Only the menu/quit keys above act while the too-small
+			// screen is up: other keys must not mutate the invisible
+			// game (e.g. ? re-opening the overlay it just replaced).
+			return a, nil
 		}
 	}
 	var cmd tea.Cmd
