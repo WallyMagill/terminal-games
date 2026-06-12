@@ -367,6 +367,45 @@ func TestAppQKeyQuitsFromGame(t *testing.T) {
 	}
 }
 
+// Pins the view-scoping of the App's m/esc/q interception (a.view ==
+// viewGame): on the menu those keys belong to the focused view, so through
+// the real App.Update path esc on the menu list quits (not eaten by the
+// interception), q in the custom form is a non-digit no-op (not quit), and
+// esc in the form closes it without losing the typed input.
+func TestAppMenuKeysNotInterceptedByGameSwitch(t *testing.T) {
+	a := testApp(t)
+	_, cmd := a.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("esc on the menu list through the App must quit")
+	}
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Error("esc on the menu list should produce tea.QuitMsg")
+	}
+
+	a = testApp(t)
+	for i := 0; i < 3; i++ {
+		a, _ = updApp(t, a, key("j"))
+	}
+	a, _ = updApp(t, a, key("enter"))
+	if !a.menu.showForm {
+		t.Fatal("enter on Custom should open the form")
+	}
+	a, _ = updApp(t, a, key("9"))
+	_, cmd = a.Update(key("q"))
+	if cmd != nil {
+		if _, ok := cmd().(tea.QuitMsg); ok {
+			t.Error("q while the custom form is open must be ignored as a non-digit, not quit")
+		}
+	}
+	a, _ = updApp(t, a, tea.KeyMsg{Type: tea.KeyEsc})
+	if a.menu.showForm {
+		t.Error("esc through the App must close the form")
+	}
+	if a.view != viewMenu {
+		t.Errorf("view = %v, want viewMenu", a.view)
+	}
+}
+
 func TestAppWinShowsBestTimeOnMenu(t *testing.T) {
 	a := winTiny(t, testApp(t), "beginner")
 	model, _ := a.Update(key("m"))
