@@ -43,6 +43,37 @@ func TestMenuAndFormLinesFitTerminalWidth(t *testing.T) {
 	}
 }
 
+// Audit round 3 (finding 5): a row's full width depends on its best time
+// ("best: 003" is two columns wider than "best: —"), and menuRow used to
+// pick full vs compact per row — so at widths 42-43 with a partial score
+// set, recorded rows rendered compact directly above unrecorded full ones,
+// misaligning the best value by 16 columns. The variant must be decided
+// once for the whole preset block: if any full row overflows the budget,
+// every row renders compact, and the best value column stays aligned.
+func TestMenuPresetRowsShareOneVariant(t *testing.T) {
+	for termW, wantFull := range map[int]bool{42: false, 43: false, 44: true} {
+		m := newMenuModel(store.Scores{"beginner": 3}, termW, 24)
+		m.cursor = itemQuit // keep preset rows unstyled
+		v := m.View()
+		checkLinesFit(t, fmt.Sprintf("menu w=%d", termW), v, termW)
+		rows := strings.Split(v, "\n")[2 : 2+len(presets)]
+		var bestCols []int
+		for i, row := range rows {
+			if got := strings.Contains(row, "best:"); got != wantFull {
+				t.Errorf("w=%d: preset row %d full=%v, want full=%v: %q",
+					termW, i, got, wantFull, row)
+			}
+			bestCols = append(bestCols, lipgloss.Width(row[:strings.LastIndexByte(row, ' ')+1]))
+		}
+		for i, c := range bestCols[1:] {
+			if c != bestCols[0] {
+				t.Errorf("w=%d: best value column ragged: row 0 starts it at col %d, row %d at col %d\n%s",
+					termW, bestCols[0], i+1, c, v)
+			}
+		}
+	}
+}
+
 // Wide terminals (and unknown size, width 0) keep the spacious full row
 // format and the full form hint — adaptation must not regress them.
 func TestMenuKeepsFullFormatWhenWide(t *testing.T) {

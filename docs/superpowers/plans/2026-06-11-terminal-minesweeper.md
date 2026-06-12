@@ -2820,6 +2820,18 @@ git commit -m "feat: root model routing and program entry point"
 > exactly as before, and a double-width rune that can never fit a 1-column
 > budget is emitted whole rather than dropped.
 
+> **Execution amendment (audit-driven):** the full/compact preset-row swap
+> was decided per row, but a row's full width depends on its best time
+> (`best: 003` is two columns wider than `best: —`) — so at terminal
+> widths 42–43 with a partial score set, recorded rows rendered compact
+> directly above unrecorded full ones, starting the best value 16 columns
+> apart and breaking the alignment the dims padding establishes. The
+> variant is now chosen once for the whole preset block (`allFit` over
+> the full rows next to the 3-column cursor prefix): if any full row
+> overflows, every row renders compact. Uniform score sets keep their
+> previous thresholds (all-full from 42 columns with no times recorded,
+> from 44 with all recorded; wide and unknown-size terminals unchanged).
+
 ---
 
 ### Task 15: Final verification
