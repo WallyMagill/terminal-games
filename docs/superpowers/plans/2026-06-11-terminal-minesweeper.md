@@ -2832,6 +2832,25 @@ git commit -m "feat: root model routing and program entry point"
 > previous thresholds (all-full from 42 columns with no times recorded,
 > from 44 with all recorded; wide and unknown-size terminals unchanged).
 
+> **Execution amendment (audit-driven):** the claim two amendments above
+> that below the 30-column game floor the menu "degrades by clamping"
+> overstated what the code does; this corrects the record rather than the
+> code. Only the menu list rows are clamped (`clampLine` to the budget
+> left of the 3-column cursor prefix), and only while that budget is
+> positive — at a known width of 3 columns or fewer the budget hits the
+> `termW <= 0` "size unknown" sentinels and the rows pass through whole.
+> The ` MINES` title, the custom form's header and field rows (≤ 14
+> columns), and the form hint (which only swaps to its 29-column compact
+> variant via `fitLine`, never clamps) are not clamped at all, so the
+> form emits over-wide lines on terminals narrower than 29 columns.
+> Validation errors are the one part that degrades to any width: they
+> word-wrap and hard-break per the wrapText amendment above. The gap is
+> accepted as cosmetic-only: Bubble Tea's standard renderer hard-truncates
+> every emitted line to the terminal width before painting, no board is
+> playable below 30 columns (the form fit check reports `max 0×N` there),
+> and the true part of the claim stands — the menu adds no too-small
+> screen and every row remains navigable and selectable at any width.
+
 ---
 
 ### Task 15: Final verification
