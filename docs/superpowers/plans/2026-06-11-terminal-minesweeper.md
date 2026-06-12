@@ -2889,6 +2889,16 @@ git commit -m "feat: root model routing and program entry point"
 > height-degradation ladder for the menu would add more code surface than
 > the cosmetic gap warrants.
 
+> **Execution amendment (audit-driven, accepted tradeoff):** recording the
+> help-overlay height clip that the previous amendment mirrors — accepted
+> at design time but never written into this record until now. The `?`
+> help overlay renders an 8-line block against the single status row
+> budgeted in `boardChromeRows`, so on a terminal at exactly
+> `frameRows(h)` the renderer drops the topmost lines (margin, HUD, and
+> leading board rows) while the overlay is open. Accepted because the
+> overlay is transient, any key closes it, the board redraws intact
+> afterwards, and terminals taller than exact-fit show it whole.
+
 ---
 
 ### Task 15: Final verification
