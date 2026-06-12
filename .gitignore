@@ -1,3 +1,4 @@
 mines
 *.test
 coverage.out
+.claude/
