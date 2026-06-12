@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -42,5 +43,19 @@ func TestClampLineWidthZeroMeansUnknown(t *testing.T) {
 	m := newMenuModel(store.Scores{}, 0, 0)
 	if !strings.Contains(m.View(), "enter select") {
 		t.Error("menu at unknown size lost its key hint")
+	}
+}
+
+// wrapText budgets termW-1 columns, reserving one for the leading margin
+// its callers prepend: a line wrapped to exactly termW would render at
+// termW+1 and be truncated mid-word. "ab cd" is 5 cols, so at termW=5 it
+// must split. Kills the mutant widening the budget to termW. (Compared
+// with slices.Equal: fmt.Sprint flattens ["ab cd"] and ["ab","cd"] to
+// the same string.)
+func TestWrapTextReservesMarginColumn(t *testing.T) {
+	got := wrapText("ab cd", 5)
+	want := []string{"ab", "cd"}
+	if !slices.Equal(got, want) {
+		t.Errorf("wrapText(\"ab cd\", 5) = %q, want %q", got, want)
 	}
 }
