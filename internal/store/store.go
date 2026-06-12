@@ -79,7 +79,9 @@ func (s *Store) Save(sc Scores) error {
 		werr = cerr
 	}
 	if werr == nil {
-		// CreateTemp opens at 0600; keep the 0644 the store always wrote.
+		// CreateTemp opens at 0600; widen to a fixed 0644. Unlike the old
+		// WriteFile path, Chmod is not masked by the umask, so unusual
+		// umasks (e.g. 077) now still yield 0644 rather than 0600.
 		werr = os.Chmod(tmp, 0o644)
 	}
 	if werr == nil {
