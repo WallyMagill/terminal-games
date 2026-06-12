@@ -2877,6 +2877,18 @@ git commit -m "feat: root model routing and program entry point"
 > and the true part of the claim stands — the menu adds no too-small
 > screen and every row remains navigable and selectable at any width.
 
+> **Execution amendment (audit-driven, accepted tradeoff):** the menu has
+> no HEIGHT adaptation to mirror its width adaptation: the list view
+> always emits 11 lines, and on terminals 10 rows or shorter Bubble Tea's
+> standard renderer drops lines from the top — at 8–9 rows the title
+> disappears, at 7 rows (where a 2×2 custom board is still playable) the
+> selected Beginner row scrolls off while remaining selected. Recorded as
+> accepted rather than fixed, mirroring the help-overlay height-clip
+> tradeoff: the truncation is clean (no corruption), every row stays
+> selectable, heights this small are degenerate for a board game, and a
+> height-degradation ladder for the menu would add more code surface than
+> the cosmetic gap warrants.
+
 ---
 
 ### Task 15: Final verification
