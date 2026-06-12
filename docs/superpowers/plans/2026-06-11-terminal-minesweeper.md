@@ -1719,6 +1719,26 @@ git commit -m "feat: game model with cursor, key routing, and timer start"
 > rescheduling. activate() starts the timer only when status is exactly
 > `Playing`. Chord routing, arrow keys, and up/left movement gained tests.
 
+> **Execution amendment (audit-driven):** key routing pinned above dispatched
+> `msg.String()` whole, so a coalesced multi-rune `KeyRunes` message — Bubble
+> Tea's parser collects the longest run of printable runes from one terminal
+> read, so fast typing, key repeat under render lag, and SSH byte batching
+> deliver e.g. `"jl"` as ONE message — matched no case and silently dropped
+> every key in the batch. The game view now expands key messages through a
+> shared `typedKeys` helper (`internal/ui/keys.go`): non-paste multi-rune
+> messages dispatch rune by rune in order through the same `handleKey`,
+> extending the Task 13 form rule (each character behaves exactly as if
+> typed; an unbound rune is ignored individually) to the whole view. Pasted
+> text (`Paste:true`) is deliberately fully inert outside the form — it does
+> not execute as game commands and does not count as "any key" for closing
+> the help overlay (previously a paste hit the catch-all and closed it);
+> executing pasted strings as commands is dangerous, matching classic TUI
+> behavior. Special keys, single runes, and alt-modified runes are unchanged.
+> App-level interception (`m`/`esc`/`q`, ctrl+c) still compares the whole
+> message: those keys keep working when typed alone (esc/ctrl+c are never
+> part of a rune run), and a coalesced `m`/`q` inside a batch reaches the
+> focused view, which ignores it — a deliberate non-goal of this fix.
+
 ---
 
 ### Task 11: Game model — timer ticks and best-time recording
@@ -2465,6 +2485,16 @@ git commit -m "feat: menu with presets, best times, validated custom form"
 > filter per rune: a multi-rune message behaves exactly as if each character
 > were typed — digits append in order up to the 3-char cap, non-digits are
 > ignored. Single-key typing and alt-modified runes behave as before.
+
+> **Execution amendment (audit-driven):** the menu list had the same coalesced
+> -input drop as the game view (see the Task 10 amendment): its `Update`
+> switched on the whole `keyMsg.String()`, so a rune-batched `"jj"` moved the
+> selection zero rows. The list switch is now `handleListKey`, fed rune by
+> rune through the shared `typedKeys` helper — non-paste multi-rune messages
+> act per rune in order, pasted text is fully inert on the list. The form is
+> unaffected (it filters `msg.Runes` itself, per the amendment above) and
+> cannot open mid-batch: only enter/space open it, and the parser never
+> coalesces those into a rune run.
 
 ---
 

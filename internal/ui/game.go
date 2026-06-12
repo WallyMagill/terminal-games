@@ -58,7 +58,14 @@ func (m gameModel) Update(msg tea.Msg) (gameModel, tea.Cmd) {
 		m.running = false
 		return m, nil
 	case tea.KeyMsg:
-		return m.handleKey(msg.String())
+		// Coalesced typing dispatches per rune; pastes expand to nothing.
+		var cmds []tea.Cmd
+		for _, k := range typedKeys(msg) {
+			var cmd tea.Cmd
+			m, cmd = m.handleKey(k)
+			cmds = append(cmds, cmd)
+		}
+		return m, tea.Batch(cmds...)
 	}
 	return m, nil
 }

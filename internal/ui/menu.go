@@ -46,7 +46,20 @@ func (m menuModel) Update(msg tea.Msg) (menuModel, tea.Cmd) {
 	if m.showForm {
 		return m.updateForm(keyMsg)
 	}
-	switch keyMsg.String() {
+	// Coalesced typing dispatches per rune; pastes expand to nothing. The
+	// form cannot open mid-batch: only enter/space open it, and the parser
+	// never coalesces those into a rune run.
+	var cmds []tea.Cmd
+	for _, k := range typedKeys(keyMsg) {
+		var cmd tea.Cmd
+		m, cmd = m.handleListKey(k)
+		cmds = append(cmds, cmd)
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m menuModel) handleListKey(k string) (menuModel, tea.Cmd) {
+	switch k {
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
