@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/wallymagill/mines/internal/store"
 )
 
@@ -56,12 +55,7 @@ func TestAppTooSmallScreenFitsHostileTerminals(t *testing.T) {
 				t.Errorf("too-small screen is %d rows on a %d-row terminal:\n%s",
 					len(lines), termH, v)
 			}
-			for i, line := range lines {
-				if w := lipgloss.Width(line); w > termW {
-					t.Errorf("line %d is %d cols on a %d-col terminal: %q",
-						i, w, termW, line)
-				}
-			}
+			checkLinesFit(t, fmt.Sprintf("too-small screen at %d×%d", termW, termH), v, termW)
 		})
 	}
 }
@@ -119,11 +113,7 @@ func TestAppTooSmallFloorClampsBelowNineCols(t *testing.T) {
 	a := NewApp(store.New(t.TempDir() + "/scores.json"))
 	a, _ = updApp(t, a, tea.WindowSizeMsg{Width: 5, Height: 2})
 	a, _ = updApp(t, a, startGameMsg{preset: presets[0]})
-	for i, line := range strings.Split(a.View(), "\n") {
-		if w := lipgloss.Width(line); w > 5 {
-			t.Errorf("line %d is %d cols on a 5-col terminal: %q", i, w, line)
-		}
-	}
+	checkLinesFit(t, "floor clamp on a 5-col terminal", a.View(), 5)
 }
 
 // TestAppFrameFitsWheneverGuardAccepts is the guard's contract as a
@@ -169,11 +159,7 @@ func TestAppFrameFitsWheneverGuardAccepts(t *testing.T) {
 				if len(lines) > termH {
 					t.Errorf("view is %d lines on a %d-row terminal:\n%s", len(lines), termH, v)
 				}
-				for _, line := range lines {
-					if lw := lipgloss.Width(line); lw > termW {
-						t.Errorf("line is %d cols on a %d-col terminal: %q", lw, termW, line)
-					}
-				}
+				checkLinesFit(t, "accepted-or-rejected frame", v, termW)
 			})
 		}
 	}

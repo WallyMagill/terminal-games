@@ -98,20 +98,7 @@ func TestViewHelpOverlay(t *testing.T) {
 }
 
 func TestViewWonShowsCelebrationAndAutoFlags(t *testing.T) {
-	s := store.New(t.TempDir() + "/scores.json")
-	p := Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}
-	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for y := 0; y < 2; y++ {
-		for x := 0; x < 2; x++ {
-			m.cursorX, m.cursorY = x, y
-			if c, _ := m.game.CellAt(x, y); !c.Mine {
-				m, _ = m.Update(key(" "))
-			}
-		}
-	}
+	m := wonGameModel(t)
 	v := m.View()
 	for _, want := range []string{"😎", "Cleared in", "NEW BEST!", "⚑"} {
 		if !strings.Contains(v, want) {
@@ -124,28 +111,12 @@ func TestViewWonShowsCelebrationAndAutoFlags(t *testing.T) {
 	}
 }
 
-// wonGameModel returns a freshly won 2×2 game (mirrors the seed-3 walk in
-// TestViewWonShowsCelebrationAndAutoFlags).
+// wonGameModel returns a freshly won 2×2 game over its own throwaway store
+// (the seed-3 walk, with the "beginner" preset key).
 func wonGameModel(t *testing.T) gameModel {
 	t.Helper()
 	s := store.New(t.TempDir() + "/scores.json")
-	p := Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}
-	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for y := 0; y < 2; y++ {
-		for x := 0; x < 2; x++ {
-			m.cursorX, m.cursorY = x, y
-			if c, _ := m.game.CellAt(x, y); !c.Mine {
-				m, _ = m.Update(key(" "))
-			}
-		}
-	}
-	if m.game.Status() != engine.Won {
-		t.Fatal("seed-3 walk should win the 2×2 game")
-	}
-	return m
+	return winSeed3Board(t, s, Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}, 0)
 }
 
 // Every status-line variant the game can show on the narrowest accepted
@@ -207,11 +178,7 @@ func TestHelpOverlayLinesFitChromeCols(t *testing.T) {
 	m := testGameModel(t)
 	m.termW = chromeCols
 	m, _ = m.Update(key("?"))
-	for _, line := range strings.Split(m.View(), "\n") {
-		if w := lipgloss.Width(line); w > chromeCols {
-			t.Errorf("overlay line %q is %d cols, max %d", line, w, chromeCols)
-		}
-	}
+	checkLinesFit(t, "help overlay", m.View(), chromeCols)
 }
 
 // The HUD must keep a constant width as the mine counter moves through its

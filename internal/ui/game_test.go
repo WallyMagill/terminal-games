@@ -21,6 +21,32 @@ func testGameModel(t *testing.T) gameModel {
 	return m
 }
 
+// winSeed3Board builds a 2×2/1-mine game for preset p over store s and wins
+// it via the deterministic seed-3 walk: the first reveal triggers placement
+// excluding (0,0), later iterations read the real board, and revealing the
+// three safe cells wins. elapsed is set before the walk so the winning
+// reveal records that time.
+func winSeed3Board(t *testing.T, s *store.Store, p Preset, elapsed int) gameModel {
+	t.Helper()
+	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.elapsed = elapsed
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			m.cursorX, m.cursorY = x, y
+			if c, _ := m.game.CellAt(x, y); !c.Mine {
+				m, _ = m.Update(key(" "))
+			}
+		}
+	}
+	if m.game.Status() != engine.Won {
+		t.Fatal("seed-3 walk should win the 2×2 game")
+	}
+	return m
+}
+
 func key(s string) tea.KeyMsg {
 	switch s {
 	case " ":

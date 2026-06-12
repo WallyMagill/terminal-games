@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/wallymagill/mines/internal/engine"
 	"github.com/wallymagill/mines/internal/store"
 )
@@ -171,11 +170,7 @@ func TestAppNarrowAcceptedTerminalChromeFits(t *testing.T) {
 	if strings.Contains(v, "too small") {
 		t.Fatal("Beginner must be accepted on a 50×20 terminal")
 	}
-	for _, line := range strings.Split(v, "\n") {
-		if w := lipgloss.Width(line); w > 50 {
-			t.Errorf("line is %d cols wide on an accepted 50-col terminal: %q", w, line)
-		}
-	}
+	checkLinesFit(t, "accepted 50-col terminal", v, 50)
 }
 
 // The too-small screen must itself fit the terminal that triggered it —
@@ -194,11 +189,7 @@ func TestAppTooSmallMessageFitsTrigger(t *testing.T) {
 	if len(lines) > 15 {
 		t.Errorf("too-small screen has %d lines on a 15-row terminal", len(lines))
 	}
-	for _, line := range lines {
-		if w := lipgloss.Width(line); w > 27 {
-			t.Errorf("too-small line is %d cols on the 27-col terminal that triggered it: %q", w, line)
-		}
-	}
+	checkLinesFit(t, "too-small screen on its 27-col trigger", v, 27)
 }
 
 // Before the first WindowSizeMsg the terminal size is unknown (0×0); the
@@ -299,11 +290,7 @@ func TestAppResizeMidGameAdaptsChrome(t *testing.T) {
 	if strings.Contains(v, "q quit") {
 		t.Error("30-col terminal must swap to the compact hint")
 	}
-	for _, line := range strings.Split(v, "\n") {
-		if w := lipgloss.Width(line); w > 30 {
-			t.Errorf("line is %d cols on an accepted 30-col terminal (bubbletea will truncate): %q", w, line)
-		}
-	}
+	checkLinesFit(t, "accepted 30-col terminal after mid-game shrink", v, 30)
 	if got := boardLines(t, v, presets[0].Height); strings.Join(got, "\n") != strings.Join(wideBoard, "\n") {
 		t.Error("board content changed across a resize; model state must be size-independent")
 	}

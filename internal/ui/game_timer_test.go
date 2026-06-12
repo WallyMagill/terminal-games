@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"math/rand"
 	"strings"
 	"testing"
 
@@ -75,23 +74,8 @@ func TestStaleTickFromPreviousRoundIsIgnored(t *testing.T) {
 
 func TestWinRecordsBestTimeForPreset(t *testing.T) {
 	s := store.New(t.TempDir() + "/scores.json")
-	// 2x2 board, 1 mine: revealing the three safe cells wins. The first
-	// reveal triggers placement excluding (0,0); later iterations read the
-	// real board.
 	p := Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}
-	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	m.elapsed = 7 // pretend 7 seconds passed
-	for y := 0; y < 2; y++ {
-		for x := 0; x < 2; x++ {
-			m.cursorX, m.cursorY = x, y
-			if c, _ := m.game.CellAt(x, y); !c.Mine {
-				m, _ = m.Update(key(" "))
-			}
-		}
-	}
+	m := winSeed3Board(t, s, p, 7) // pretend 7 seconds passed before the win
 	if got := s.Load()["beginner"]; got != 7 {
 		t.Errorf("recorded best = %d, want 7", got)
 	}
@@ -107,18 +91,7 @@ func TestWinRecordsBestTimeForPreset(t *testing.T) {
 func TestNewBestSurvivesExtraKeypressAfterWin(t *testing.T) {
 	s := store.New(t.TempDir() + "/scores.json")
 	p := Preset{Name: "Tiny", Key: "beginner", Width: 2, Height: 2, Mines: 1}
-	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for y := 0; y < 2; y++ {
-		for x := 0; x < 2; x++ {
-			m.cursorX, m.cursorY = x, y
-			if c, _ := m.game.CellAt(x, y); !c.Mine {
-				m, _ = m.Update(key(" "))
-			}
-		}
-	}
+	m := winSeed3Board(t, s, p, 0)
 	if !m.newBest {
 		t.Fatal("setup: first win should be a new best")
 	}
@@ -130,19 +103,7 @@ func TestNewBestSurvivesExtraKeypressAfterWin(t *testing.T) {
 
 func TestCustomGamesDoNotRecordTimes(t *testing.T) {
 	s := store.New(t.TempDir() + "/scores.json")
-	p := Preset{Name: "Custom", Key: "", Width: 2, Height: 2, Mines: 1}
-	m, err := newGameModel(p, s, rand.New(rand.NewSource(3)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for y := 0; y < 2; y++ {
-		for x := 0; x < 2; x++ {
-			m.cursorX, m.cursorY = x, y
-			if c, _ := m.game.CellAt(x, y); !c.Mine {
-				m, _ = m.Update(key(" "))
-			}
-		}
-	}
+	winSeed3Board(t, s, Preset{Name: "Custom", Key: "", Width: 2, Height: 2, Mines: 1}, 0)
 	if got := s.Load(); len(got) != 0 {
 		t.Errorf("custom game recorded a time: %v", got)
 	}
