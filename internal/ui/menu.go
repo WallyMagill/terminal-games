@@ -183,7 +183,8 @@ func (m menuModel) View() string {
 	for i, p := range presets {
 		// Dims are padded to the widest preset ("30×16", 5 cols; × is one
 		// rune and one column) so the best: column lines up across rows —
-		// in both the full and the compact (≤ 30-col terminal) variants.
+		// in both the full and the compact (chosen below whenever any
+		// full row overflows the width budget) variants.
 		dims := fmt.Sprintf("%d×%d", p.Width, p.Height)
 		full[i] = fmt.Sprintf("%-13s %-5s · %d mines  best: %s",
 			p.Name, dims, p.Mines, m.bestFor(p.Key))
