@@ -333,3 +333,41 @@ func TestCorruptFileRecoversOnNextSave(t *testing.T) {
 		t.Errorf("best after recovery = %d, want 250", got)
 	}
 }
+
+// The sweep must only ever match the store's own temp naming scheme
+// (scores-*.tmp). Old .tmp files in the config dir that the store did not
+// create — e.g. a user's manual backup before hand-editing scores.json,
+// the same hand-editing scenario Load's [0,999] sanitization defends
+// against — must never be touched, no matter how old. Kills the mutant
+// that widens the sweep glob from "scores-*.tmp" to "*.tmp".
+func TestSweepNeverDeletesForeignTempFiles(t *testing.T) {
+	s, path := tempStore(t)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	foreign := []string{
+		"scores.json.tmp", // manual backup: matches *.tmp, not scores-*.tmp
+		"backup.tmp",      // arbitrary user .tmp file
+	}
+	for _, name := range foreign {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte("user data"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := s.Save(store.Scores{"beginner": 4}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, name := range foreign {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("sweep deleted foreign file %q it did not create: %v", name, err)
+		}
+	}
+}
