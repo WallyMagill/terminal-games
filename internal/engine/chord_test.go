@@ -200,3 +200,49 @@ func TestChordNoOps(t *testing.T) {
 		t.Error("out-of-bounds chord should be a no-op")
 	}
 }
+
+// Audit finding (round 2): every committed chord test that reaches the
+// flag-count loop either chords a main-diagonal cell of a square board
+// (whose neighbor set is closed under (x,y) -> (y,x)) or places its flags
+// only on transpose-fixed diagonal cells, so a mutant that counts flags at
+// the TRANSPOSED neighbor coordinate (g.at(ny, nx) in Chord's flag-count
+// loop) always computed the correct count and survived the suite. This
+// pins the count to the true neighbor coordinates with an off-diagonal
+// chord cell and an off-diagonal flag.
+func TestChordCountsFlagsAtTrueNeighborCoordinates(t *testing.T) {
+	g := newWithMines(t, 4, 4, [][2]int{{2, 1}})
+	g.Reveal(1, 0)    // a "1": its only mine neighbor is (2,1)
+	g.CycleFlag(2, 1) // flag the mine — (1,2), its transpose, stays hidden
+	if !g.Chord(1, 0) {
+		t.Fatal("chord with the matching flag on (2,1) must fire")
+	}
+	for _, p := range [][2]int{{0, 0}, {2, 0}, {0, 1}, {1, 1}} {
+		if got := stateAt(t, g, p[0], p[1]); got != Revealed {
+			t.Errorf("(%d,%d) state = %v, want Revealed", p[0], p[1], got)
+		}
+	}
+	if g.Status() == Lost {
+		t.Error("correctly flagged chord must not lose")
+	}
+}
+
+// Companion: no committed test chords on a non-square board at all
+// (TestNonSquareBoardCoordinates exercises only Reveal/CellAt). Transposed
+// cell access inside Chord indexes past the cells slice there, so this also
+// turns coordinate-swap mutants into panics instead of silent survivors.
+func TestChordOnNonSquareBoard(t *testing.T) {
+	g := newWithMines(t, 3, 2, [][2]int{{0, 1}}) // wider than tall
+	g.Reveal(1, 0)                               // a "1"
+	g.CycleFlag(0, 1)                            // flag the mine
+	if !g.Chord(1, 0) {
+		t.Fatal("chord on a 3x2 board must fire with the mine flagged")
+	}
+	for _, p := range [][2]int{{0, 0}, {2, 0}, {1, 1}, {2, 1}} {
+		if got := stateAt(t, g, p[0], p[1]); got != Revealed {
+			t.Errorf("(%d,%d) state = %v, want Revealed", p[0], p[1], got)
+		}
+	}
+	if g.Status() != Won {
+		t.Errorf("status = %v, want Won (all safe cells revealed)", g.Status())
+	}
+}
