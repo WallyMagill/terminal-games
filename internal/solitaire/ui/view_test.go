@@ -131,8 +131,8 @@ func TestSelectedStatusLineTakesPriorityOverMessage(t *testing.T) {
 	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
 	m, _ = m.Update(key(" "))
 	v := m.View()
-	if !strings.Contains(v, "Selected") || !strings.Contains(v, "choose destination") {
-		t.Fatalf("selected view should show source and destination guidance:\n%s", v)
+	if !strings.Contains(v, "Selected") || !strings.Contains(v, "no legal destination") {
+		t.Fatalf("selected view should show source and no-destination guidance:\n%s", v)
 	}
 }
 

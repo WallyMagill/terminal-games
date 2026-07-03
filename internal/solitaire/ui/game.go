@@ -27,25 +27,26 @@ func tickCmd(session uint64, gen int) tea.Cmd {
 }
 
 type Model struct {
-	game         *engine.Game
-	scores       *store.Store
-	rng          *legacyrand.Rand
-	cursor       cursor
-	selected     *engine.Location
-	elapsed      int
-	running      bool
-	tickGen      int
-	tickSession  uint64
-	termW        int
-	termH        int
-	message      string
-	showHelp     bool
-	newBestTime  bool
-	newBestMoves bool
-	saveErr      bool
-	recordedWin  bool
-	bestSeconds  *int
-	fewestMoves  *int
+	game          *engine.Game
+	scores        *store.Store
+	rng           *legacyrand.Rand
+	cursor        cursor
+	selected      *engine.Location
+	selectedMoves []engine.Move
+	elapsed       int
+	running       bool
+	tickGen       int
+	tickSession   uint64
+	termW         int
+	termH         int
+	message       string
+	showHelp      bool
+	newBestTime   bool
+	newBestMoves  bool
+	saveErr       bool
+	recordedWin   bool
+	bestSeconds   *int
+	fewestMoves   *int
 }
 
 func NewModel(scores *store.Store, rng *legacyrand.Rand) (Model, error) {
@@ -105,7 +106,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				switch msg.String() {
 				case "m", "esc":
 					m.showHelp = false
-					m.selected = nil
+					m = m.clearSelection()
 					return m, back()
 				case "q":
 					return m, tea.Quit
@@ -141,15 +142,21 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 	case "a":
 		return m.autoFoundation()
 	case "tab":
+		if m.selected != nil {
+			return m.cycleSelectedDestination(1), nil
+		}
 		return m.cyclePlayableSource(1), nil
 	case "shift+tab", "backtab":
+		if m.selected != nil {
+			return m.cycleSelectedDestination(-1), nil
+		}
 		return m.cyclePlayableSource(-1), nil
 	case "1", "2", "3", "4", "5", "6", "7":
 		m.cursor = cursor{region: regionTableau, col: int(k[0] - '1')}
 		m.clampTableauRowToPlayable()
 	case "esc":
 		if m.selected != nil {
-			m.selected = nil
+			m = m.clearSelection()
 			m.message = ""
 			return m, nil
 		}
@@ -183,7 +190,7 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 func (m Model) draw() (Model, tea.Cmd) {
 	changed := m.game.Draw()
 	if changed {
-		m.selected = nil
+		m = m.clearSelection()
 		m.message = "Drew cards"
 	} else {
 		m.message = "No cards to draw"
@@ -202,12 +209,38 @@ func (m Model) activate() (Model, tea.Cmd) {
 			m.message = "No card selected"
 			return m, nil
 		}
-		m.selected = &loc
-		m.message = "Selected"
+		moves := m.game.LegalMovesFrom(loc)
+		switch len(moves) {
+		case 0:
+			m.selected = &loc
+			m.selectedMoves = nil
+			m.message = "No legal destination"
+			return m, nil
+		case 1:
+			changed := m.game.ApplyMove(moves[0])
+			if changed {
+				m.message = "Moved"
+			} else {
+				m.message = "Invalid move"
+			}
+			m.recordWinIfNeeded()
+			return m.startTimerIfNeeded(changed)
+		default:
+			m.selected = &loc
+			m.selectedMoves = append([]engine.Move(nil), moves...)
+			m = m.focusLocation(m.selectedMoves[0].Destination)
+			m.message = "Selected"
+			return m, nil
+		}
+	}
+	move, ok := m.selectedMoveTo(loc)
+	if !ok {
+		m = m.clearSelection()
+		m.message = "Invalid move"
 		return m, nil
 	}
-	changed := m.game.Move(*m.selected, loc)
-	m.selected = nil
+	changed := m.game.ApplyMove(move)
+	m = m.clearSelection()
 	if changed {
 		m.message = "Moved"
 	} else {
@@ -238,7 +271,7 @@ func (m Model) autoFoundation() (Model, tea.Cmd) {
 		loc = *m.selected
 	}
 	changed := m.game.AutoFoundation(loc)
-	m.selected = nil
+	m = m.clearSelection()
 	if changed {
 		m.message = "Moved to foundation"
 	} else {
@@ -557,9 +590,15 @@ func (m Model) statusLine() string {
 	}
 	if m.selected != nil {
 		description := m.selectedDescription()
+		if len(m.selectedMoves) == 0 {
+			return fitLine(m.termW,
+				styleFaint.Render(fmt.Sprintf(" Selected %s · no legal destination · esc cancel", description)),
+				styleFaint.Render(fmt.Sprintf(" Selected %s · no destination · esc", describeLocation(*m.selected))),
+			)
+		}
 		return fitLine(m.termW,
-			styleFaint.Render(fmt.Sprintf(" Selected %s · choose destination · esc cancel", description)),
-			styleFaint.Render(fmt.Sprintf(" Selected %s · esc cancel", describeLocation(*m.selected))),
+			styleFaint.Render(fmt.Sprintf(" Selected %s · choose destination · tab destinations · enter move · esc cancel", description)),
+			styleFaint.Render(fmt.Sprintf(" Selected %s · tab/enter · esc", describeLocation(*m.selected))),
 		)
 	}
 	if m.message != "" {

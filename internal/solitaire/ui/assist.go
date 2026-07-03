@@ -55,6 +55,43 @@ func (m Model) cyclePlayableSource(direction int) Model {
 	return m.focusLocation(sources[next])
 }
 
+func (m Model) cycleSelectedDestination(direction int) Model {
+	if len(m.selectedMoves) == 0 {
+		return m
+	}
+	current := m.cursor.location()
+	index := -1
+	for i, move := range m.selectedMoves {
+		if move.Destination == current {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		if direction < 0 {
+			return m.focusLocation(m.selectedMoves[len(m.selectedMoves)-1].Destination)
+		}
+		return m.focusLocation(m.selectedMoves[0].Destination)
+	}
+	next := (index + direction + len(m.selectedMoves)) % len(m.selectedMoves)
+	return m.focusLocation(m.selectedMoves[next].Destination)
+}
+
+func (m Model) selectedMoveTo(dst engine.Location) (engine.Move, bool) {
+	for _, move := range m.selectedMoves {
+		if move.Destination == dst {
+			return move, true
+		}
+	}
+	return engine.Move{}, false
+}
+
+func (m Model) clearSelection() Model {
+	m.selected = nil
+	m.selectedMoves = nil
+	return m
+}
+
 func (m *Model) clampTableauRowToPlayable() {
 	cards := m.game.Tableau(m.cursor.col)
 	if len(cards) == 0 {

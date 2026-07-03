@@ -251,6 +251,61 @@ func TestActivateIgnoresFaceDownTableauSelection(t *testing.T) {
 	}
 }
 
+func TestSpaceAppliesOnlyLegalDestinationWithoutManualTargeting(t *testing.T) {
+	m := modelWithTopTableauAce(t, engine.Spades)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m, _ = m.Update(key(" "))
+	if top, ok := m.game.FoundationTop(engine.Spades); !ok || top.Rank != engine.Ace {
+		t.Fatalf("space should move sole legal ace destination to foundation, top=%+v ok=%v", top, ok)
+	}
+	if m.selected != nil {
+		t.Fatalf("sole-destination smart move should not leave selection active: %+v", *m.selected)
+	}
+}
+
+func TestSpaceKeepsSelectionWhenMultipleDestinationsExist(t *testing.T) {
+	m := modelWithMovableKingAndTwoEmptyColumns(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m, _ = m.Update(key(" "))
+	if m.selected == nil {
+		t.Fatal("multiple destinations should keep source selected")
+	}
+	if len(m.selectedMoves) < 2 {
+		t.Fatalf("expected multiple destination candidates, got %+v", m.selectedMoves)
+	}
+	if got, want := m.cursor.location(), m.selectedMoves[0].Destination; got != want {
+		t.Fatalf("multiple destinations should highlight first candidate, got %+v want %+v", got, want)
+	}
+}
+
+func TestTabCyclesSelectedDestinationCandidates(t *testing.T) {
+	m := modelWithMovableKingAndTwoEmptyColumns(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m, _ = m.Update(key(" "))
+	m, _ = m.Update(key("tab"))
+	if got, want := m.cursor.location(), m.selectedMoves[1].Destination; got != want {
+		t.Fatalf("tab focused %+v, want next destination %+v", got, want)
+	}
+}
+
+func TestEnterAppliesHighlightedDestinationCandidate(t *testing.T) {
+	m := modelWithMovableKingAndTwoEmptyColumns(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m, _ = m.Update(key(" "))
+	dst := m.cursor.location()
+	m, cmd := m.Update(key("enter"))
+	if cmd == nil || !m.running {
+		t.Fatal("confirmed destination move should start timer")
+	}
+	if m.selected != nil {
+		t.Fatalf("confirmed destination should clear selection: %+v", *m.selected)
+	}
+	cards := m.game.Tableau(dst.Pile)
+	if len(cards) != 1 || cards[0].Card.Rank != engine.King {
+		t.Fatalf("destination tableau = %+v, want moved king", cards)
+	}
+}
+
 func TestDrawRecyclesEmptyStock(t *testing.T) {
 	m := testModel(t)
 	for range 8 {
@@ -269,7 +324,7 @@ func TestDrawRecyclesEmptyStock(t *testing.T) {
 }
 
 func TestAutoFoundationMovesCursorCard(t *testing.T) {
-	m := modelWithTopTableauAce(t)
+	m := modelWithTopTableauAce(t, engine.Spades)
 	col, row := topTableauAce(t, m.game)
 	ace := m.game.Tableau(col)[row].Card
 	m.cursor = cursor{region: regionTableau, col: col, row: row}
@@ -287,7 +342,7 @@ func TestAutoFoundationMovesCursorCard(t *testing.T) {
 }
 
 func TestAutoFoundationMovesSelectedCard(t *testing.T) {
-	m := modelWithTopTableauAce(t)
+	m := modelWithTopTableauAce(t, engine.Spades)
 	col, row := topTableauAce(t, m.game)
 	ace := m.game.Tableau(col)[row].Card
 	m.selected = &engine.Location{Kind: engine.Tableau, Pile: col, Index: row}
@@ -347,19 +402,34 @@ func TestWinningMoveRecordsDraw3Best(t *testing.T) {
 	}
 }
 
-func modelWithTopTableauAce(t *testing.T) Model {
+func modelWithTopTableauAce(t *testing.T, suit engine.Suit) Model {
 	t.Helper()
-	for seed := int64(1); seed < 500; seed++ {
-		m, err := NewModel(store.New(t.TempDir()+"/scores.json"), legacyrand.New(legacyrand.NewSource(seed)))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if hasTopTableauAce(m.game) {
-			return m
-		}
-	}
-	t.Fatal("no deterministic seed produced a top tableau ace")
-	return Model{}
+	m := testModel(t)
+	g := &engine.Game{}
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("status"), engine.Playing)
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("tableau"), [7][]engine.TableauCard{
+		{{Card: engine.Card{Rank: engine.Ace, Suit: suit}, FaceUp: true}},
+	})
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
+	m.game = g
+	return m
+}
+
+func modelWithMovableKingAndTwoEmptyColumns(t *testing.T) Model {
+	t.Helper()
+	m := testModel(t)
+	g := &engine.Game{}
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("status"), engine.Playing)
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("tableau"), [7][]engine.TableauCard{
+		{{Card: engine.Card{Rank: engine.King, Suit: engine.Spades}, FaceUp: true}},
+		nil,
+		nil,
+	})
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
+	m.game = g
+	return m
 }
 
 func hasTopTableauAce(g *engine.Game) bool {
