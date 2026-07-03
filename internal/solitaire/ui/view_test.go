@@ -61,6 +61,22 @@ func TestViewShowsSavedSolitaireRecords(t *testing.T) {
 	}
 }
 
+func TestViewShowsAssistedRecordAndMarker(t *testing.T) {
+	scores := store.New(t.TempDir() + "/scores.json")
+	_, _, err := scores.RecordSolitaireDraw3Mode(store.SolitaireAssisted, 222, 111)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testModelWithStore(t, scores)
+	m.assisted = true
+	v := m.View()
+	for _, want := range []string{"assisted", "best 222s/111m"} {
+		if !strings.Contains(v, want) {
+			t.Fatalf("assisted view missing %q:\n%s", want, v)
+		}
+	}
+}
+
 func TestHelpViewRendersControls(t *testing.T) {
 	m := testModel(t)
 	m.showHelp = true

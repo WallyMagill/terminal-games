@@ -47,6 +47,9 @@ type Model struct {
 	recordedWin   bool
 	bestSeconds   *int
 	fewestMoves   *int
+	undoStack     []*engine.Game
+	assisted      bool
+	assistReason  string
 }
 
 func NewModel(scores *store.Store, rng *legacyrand.Rand) (Model, error) {
@@ -54,7 +57,7 @@ func NewModel(scores *store.Store, rng *legacyrand.Rand) (Model, error) {
 	if err != nil {
 		return Model{}, err
 	}
-	bestSeconds, fewestMoves := loadDraw3Record(scores)
+	bestSeconds, fewestMoves := loadDraw3RecordMode(scores, store.SolitaireNormal)
 	return Model{
 		game:        game,
 		scores:      scores,
@@ -65,11 +68,11 @@ func NewModel(scores *store.Store, rng *legacyrand.Rand) (Model, error) {
 	}, nil
 }
 
-func loadDraw3Record(scores *store.Store) (*int, *int) {
+func loadDraw3RecordMode(scores *store.Store, mode store.SolitaireRecordMode) (*int, *int) {
 	if scores == nil {
 		return nil, nil
 	}
-	rec := scores.LoadRecords().Solitaire["draw3"]
+	rec := scores.LoadSolitaireDraw3(mode)
 	var bestSeconds *int
 	if rec.BestSeconds != nil {
 		bestSeconds = new(*rec.BestSeconds)
@@ -141,6 +144,8 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		return m.activate()
 	case "a":
 		return m.autoFoundation()
+	case "u":
+		return m.undo(), nil
 	case "tab":
 		if m.selected != nil {
 			return m.cycleSelectedDestination(1), nil
@@ -188,8 +193,10 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 }
 
 func (m Model) draw() (Model, tea.Cmd) {
+	before := m.game.Clone()
 	changed := m.game.Draw()
 	if changed {
+		m.undoStack = append(m.undoStack, before)
 		m = m.clearSelection()
 		m.message = "Drew cards"
 	} else {
@@ -217,8 +224,10 @@ func (m Model) activate() (Model, tea.Cmd) {
 			m.message = "No legal destination"
 			return m, nil
 		case 1:
+			before := m.game.Clone()
 			changed := m.game.ApplyMove(moves[0])
 			if changed {
+				m.undoStack = append(m.undoStack, before)
 				m.message = "Moved"
 			} else {
 				m.message = "Invalid move"
@@ -239,9 +248,11 @@ func (m Model) activate() (Model, tea.Cmd) {
 		m.message = "Invalid move"
 		return m, nil
 	}
+	before := m.game.Clone()
 	changed := m.game.ApplyMove(move)
 	m = m.clearSelection()
 	if changed {
+		m.undoStack = append(m.undoStack, before)
 		m.message = "Moved"
 	} else {
 		m.message = "Invalid move"
@@ -270,15 +281,36 @@ func (m Model) autoFoundation() (Model, tea.Cmd) {
 	if m.selected != nil {
 		loc = *m.selected
 	}
+	before := m.game.Clone()
 	changed := m.game.AutoFoundation(loc)
 	m = m.clearSelection()
 	if changed {
+		m.undoStack = append(m.undoStack, before)
 		m.message = "Moved to foundation"
 	} else {
 		m.message = "No foundation move"
 	}
 	m.recordWinIfNeeded()
 	return m.startTimerIfNeeded(changed)
+}
+
+func (m Model) undo() Model {
+	if len(m.undoStack) == 0 {
+		m.message = "Nothing to undo"
+		return m
+	}
+	last := len(m.undoStack) - 1
+	m.game = m.undoStack[last]
+	m.undoStack = m.undoStack[:last]
+	m = m.clearSelection()
+	m.assisted = true
+	m.assistReason = "undo"
+	m.recordedWin = false
+	m.newBestTime = false
+	m.newBestMoves = false
+	m.saveErr = false
+	m.message = "Undid move"
+	return m
 }
 
 func (m Model) startTimerIfNeeded(changed bool) (Model, tea.Cmd) {
@@ -297,11 +329,15 @@ func (m *Model) recordWinIfNeeded() {
 	if m.scores == nil {
 		return
 	}
-	newBestTime, newBestMoves, err := m.scores.RecordSolitaireDraw3(m.elapsed, m.game.Moves())
+	mode := store.SolitaireNormal
+	if m.assisted {
+		mode = store.SolitaireAssisted
+	}
+	newBestTime, newBestMoves, err := m.scores.RecordSolitaireDraw3Mode(mode, m.elapsed, m.game.Moves())
 	m.newBestTime = newBestTime
 	m.newBestMoves = newBestMoves
 	m.saveErr = err != nil
-	if err == nil {
+	if err == nil && !m.assisted {
 		if newBestTime {
 			m.bestSeconds = new(m.elapsed)
 		}
@@ -312,7 +348,14 @@ func (m *Model) recordWinIfNeeded() {
 }
 
 func (m Model) recordSummary() string {
-	return fmt.Sprintf("best %s/%s", formatRecordSeconds(m.bestSeconds), formatRecordMoves(m.fewestMoves))
+	if !m.assisted {
+		return fmt.Sprintf("best %s/%s", formatRecordSeconds(m.bestSeconds), formatRecordMoves(m.fewestMoves))
+	}
+	bestSeconds, fewestMoves := loadDraw3RecordMode(m.scores, store.SolitaireAssisted)
+	if m.assistReason != "" {
+		return fmt.Sprintf("assisted %s best %s/%s", m.assistReason, formatRecordSeconds(bestSeconds), formatRecordMoves(fewestMoves))
+	}
+	return fmt.Sprintf("assisted best %s/%s", formatRecordSeconds(bestSeconds), formatRecordMoves(fewestMoves))
 }
 
 func formatRecordSeconds(value *int) string {

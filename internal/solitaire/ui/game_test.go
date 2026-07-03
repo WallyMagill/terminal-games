@@ -457,6 +457,75 @@ func TestWinningMoveRecordsDraw3Best(t *testing.T) {
 	}
 }
 
+func TestUndoRestoresPreviousGameAndMarksAssisted(t *testing.T) {
+	m := testModel(t)
+	beforeStock := m.game.StockCount()
+	m, _ = m.Update(key("d"))
+	if m.game.StockCount() == beforeStock {
+		t.Fatal("draw should change stock before undo")
+	}
+	m, _ = m.Update(key("u"))
+	if m.game.StockCount() != beforeStock {
+		t.Fatalf("undo should restore stock count = %d, got %d", beforeStock, m.game.StockCount())
+	}
+	if !m.assisted {
+		t.Fatal("undo should mark game assisted")
+	}
+	if m.assistReason != "undo" {
+		t.Fatalf("assist reason = %q, want undo", m.assistReason)
+	}
+	if m.game.Moves() != 0 {
+		t.Fatalf("undo should not add another move, got %d", m.game.Moves())
+	}
+}
+
+func TestAssistedWinRecordsToAssistedBucket(t *testing.T) {
+	scores := store.New(t.TempDir() + "/scores.json")
+	m := oneMoveFromWinModel(t, scores)
+	m.assisted = true
+	m, _ = m.Update(key("a"))
+	record := scores.LoadSolitaireDraw3(store.SolitaireAssisted)
+	if record.BestSeconds == nil || record.FewestMoves == nil {
+		t.Fatalf("assisted win should write assisted record, got %+v", record)
+	}
+	normal := scores.LoadSolitaireDraw3(store.SolitaireNormal)
+	if normal.BestSeconds != nil || normal.FewestMoves != nil {
+		t.Fatalf("assisted win should not write normal record, got %+v", normal)
+	}
+}
+
+func TestUndoAfterWinAllowsAssistedRecordOnReplay(t *testing.T) {
+	scores := store.New(t.TempDir() + "/scores.json")
+	m := oneMoveFromWinModel(t, scores)
+	m, _ = m.Update(key("a"))
+	if normal := scores.LoadSolitaireDraw3(store.SolitaireNormal); normal.BestSeconds == nil {
+		t.Fatalf("initial win should write normal record, got %+v", normal)
+	}
+
+	m, _ = m.Update(key("u"))
+	if !m.assisted {
+		t.Fatal("undoing a win should mark the replay assisted")
+	}
+	if m.game.Status() != engine.Playing {
+		t.Fatalf("undoing a win should restore a playing game, got %v", m.game.Status())
+	}
+
+	m, _ = m.Update(key("a"))
+	record := scores.LoadSolitaireDraw3(store.SolitaireAssisted)
+	if record.BestSeconds == nil || record.FewestMoves == nil {
+		t.Fatalf("assisted replay should write assisted record, got %+v", record)
+	}
+}
+
+func oneMoveFromWinModel(t *testing.T, scores *store.Store) Model {
+	t.Helper()
+	m := testModelWithStore(t, scores)
+	m.game = oneMoveFromWin(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m.elapsed = 12
+	return m
+}
+
 func modelWithTopTableauAce(t *testing.T, suit engine.Suit) Model {
 	t.Helper()
 	m := testModel(t)
