@@ -726,6 +726,7 @@ func (m Model) helpView() string {
 		" spc/enter    select card or move selection",
 		" d            draw 3 / recycle stock",
 		" h            hint",
+		" u            undo last move (assisted)",
 		" a            move focused/selected safe card to foundation",
 		" A            auto-foundation all safe cards",
 		" esc          cancel selection / menu",

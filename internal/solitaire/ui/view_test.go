@@ -88,6 +88,17 @@ func TestHelpViewRendersControls(t *testing.T) {
 	}
 }
 
+func TestHelpViewDocumentsUndoAssistedControl(t *testing.T) {
+	m := testModel(t)
+	m.showHelp = true
+	v := m.View()
+	for _, want := range []string{"u            undo", "undo last move (assisted)"} {
+		if !strings.Contains(v, want) {
+			t.Fatalf("help missing undo control %q:\n%s", want, v)
+		}
+	}
+}
+
 func TestDrawUpdatesWasteInView(t *testing.T) {
 	m := testModel(t)
 	before := m.View()
