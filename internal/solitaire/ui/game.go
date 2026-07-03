@@ -145,7 +145,7 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 	case "a":
 		return m.autoFoundation()
 	case "u":
-		return m.undo(), nil
+		return m.undo()
 	case "tab":
 		if m.selected != nil {
 			return m.cycleSelectedDestination(1), nil
@@ -294,10 +294,10 @@ func (m Model) autoFoundation() (Model, tea.Cmd) {
 	return m.startTimerIfNeeded(changed)
 }
 
-func (m Model) undo() Model {
+func (m Model) undo() (Model, tea.Cmd) {
 	if len(m.undoStack) == 0 {
 		m.message = "Nothing to undo"
-		return m
+		return m, nil
 	}
 	last := len(m.undoStack) - 1
 	m.game = m.undoStack[last]
@@ -310,7 +310,7 @@ func (m Model) undo() Model {
 	m.newBestMoves = false
 	m.saveErr = false
 	m.message = "Undid move"
-	return m
+	return m.startTimerIfNeeded(true)
 }
 
 func (m Model) startTimerIfNeeded(changed bool) (Model, tea.Cmd) {

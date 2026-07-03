@@ -517,6 +517,32 @@ func TestUndoAfterWinAllowsAssistedRecordOnReplay(t *testing.T) {
 	}
 }
 
+func TestUndoAfterStoppedWinRestartsTimerForRestoredPlayingGame(t *testing.T) {
+	m := oneMoveFromWinModel(t, store.New(t.TempDir()+"/scores.json"))
+	m.running = true
+
+	m, _ = m.Update(key("a"))
+	if m.game.Status() != engine.Won {
+		t.Fatalf("status = %v, want won", m.game.Status())
+	}
+
+	m, _ = m.Update(tickMsg{session: m.tickSession, gen: m.tickGen})
+	if m.running {
+		t.Fatal("winning tick should stop the timer")
+	}
+
+	m, cmd := m.Update(key("u"))
+	if m.game.Status() != engine.Playing {
+		t.Fatalf("undoing a win should restore a playing game, got %v", m.game.Status())
+	}
+	if !m.running {
+		t.Fatal("undoing a win should restart timer for restored playing game")
+	}
+	if cmd == nil {
+		t.Fatal("undoing a win should schedule a timer tick for restored playing game")
+	}
+}
+
 func oneMoveFromWinModel(t *testing.T, scores *store.Store) Model {
 	t.Helper()
 	m := testModelWithStore(t, scores)
