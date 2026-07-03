@@ -75,6 +75,12 @@ func (g *Game) Moves() int      { return g.moves }
 func (g *Game) Status() Status  { return g.status }
 func (g *Game) StockCount() int { return len(g.stock) }
 
+func (g *Game) TableauLen(col int) int {
+	if col < 0 || col >= len(g.tableau) {
+		return 0
+	}
+	return len(g.tableau[col])
+}
 func (g *Game) WasteVisible() []Card {
 	start := len(g.waste) - 3
 	if start < 0 {

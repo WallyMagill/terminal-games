@@ -319,7 +319,7 @@ func (m Model) requiredRows() int {
 func (m Model) maxTableauRows() int {
 	maxRows := 0
 	for col := range 7 {
-		if rows := len(m.game.Tableau(col)); rows > maxRows {
+		if rows := m.game.TableauLen(col); rows > maxRows {
 			maxRows = rows
 		}
 	}
