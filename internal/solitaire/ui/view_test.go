@@ -131,11 +131,8 @@ func TestSelectedStatusLineTakesPriorityOverMessage(t *testing.T) {
 	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
 	m, _ = m.Update(key(" "))
 	v := m.View()
-	if !strings.Contains(v, "selected · choose destination") {
-		t.Fatalf("selected view should show destination guidance:\n%s", v)
-	}
-	if strings.Contains(v, "\n Selected") {
-		t.Fatalf("selected view should not show the generic selected message:\n%s", v)
+	if !strings.Contains(v, "Selected") || !strings.Contains(v, "choose destination") {
+		t.Fatalf("selected view should show source and destination guidance:\n%s", v)
 	}
 }
 
@@ -213,6 +210,16 @@ func TestViewDecoratesSelectedTableauStack(t *testing.T) {
 	want := styleSelected.Render(styledCard(card))
 	if !strings.Contains(v, want) {
 		t.Fatalf("selected tableau card missing %q:\n%q", want, v)
+	}
+}
+
+func TestSelectedStatusNamesSourceCard(t *testing.T) {
+	m := testModel(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m, _ = m.Update(key(" "))
+	v := m.View()
+	if !strings.Contains(v, "Selected") || !strings.Contains(v, "tableau 1") {
+		t.Fatalf("selected status should name source card and pile:\n%s", v)
 	}
 }
 

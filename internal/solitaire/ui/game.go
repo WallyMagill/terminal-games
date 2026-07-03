@@ -140,6 +140,13 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		return m.activate()
 	case "a":
 		return m.autoFoundation()
+	case "tab":
+		return m.cyclePlayableSource(1), nil
+	case "shift+tab", "backtab":
+		return m.cyclePlayableSource(-1), nil
+	case "1", "2", "3", "4", "5", "6", "7":
+		m.cursor = cursor{region: regionTableau, col: int(k[0] - '1')}
+		m.clampTableauRowToPlayable()
 	case "esc":
 		if m.selected != nil {
 			m.selected = nil
@@ -549,9 +556,10 @@ func (m Model) statusLine() string {
 		return fitLine(m.termW, full, compact)
 	}
 	if m.selected != nil {
+		description := m.selectedDescription()
 		return fitLine(m.termW,
-			styleFaint.Render(" selected · choose destination · esc cancel"),
-			styleFaint.Render(" selected · esc cancel"),
+			styleFaint.Render(fmt.Sprintf(" Selected %s · choose destination · esc cancel", description)),
+			styleFaint.Render(fmt.Sprintf(" Selected %s · esc cancel", describeLocation(*m.selected))),
 		)
 	}
 	if m.message != "" {

@@ -27,6 +27,10 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyUp}
 	case "down":
 		return tea.KeyMsg{Type: tea.KeyDown}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
+	case "shift+tab", "backtab":
+		return tea.KeyMsg{Type: tea.KeyShiftTab}
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }
@@ -405,6 +409,48 @@ func oneMoveFromWin(t *testing.T) *engine.Game {
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("status"), engine.Playing)
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("moves"), 0)
 	return g
+}
+
+func TestTabCyclesPlayableSourcesAndSkipsFaceDownCards(t *testing.T) {
+	m := testModel(t)
+	m.cursor = cursor{region: regionTableau, col: 6, row: 0}
+	before := m.cursor
+	m, _ = m.Update(key("tab"))
+	if m.cursor == before {
+		t.Fatalf("tab should move to a playable source, cursor remained %+v", m.cursor)
+	}
+	loc := m.cursor.location()
+	if loc.Kind == engine.Tableau {
+		cards := m.game.Tableau(loc.Pile)
+		if loc.Index < 0 || loc.Index >= len(cards) || !cards[loc.Index].FaceUp {
+			t.Fatalf("tab focused non-playable tableau location: cursor=%+v cards=%+v", m.cursor, cards)
+		}
+	}
+}
+
+func TestBacktabCyclesPlayableSourcesBackward(t *testing.T) {
+	m := testModel(t)
+	m, _ = m.Update(key("tab"))
+	first := m.cursor
+	m, _ = m.Update(key("shift+tab"))
+	if m.cursor == first {
+		t.Fatalf("shift+tab should cycle backward from first playable source, cursor remained %+v", m.cursor)
+	}
+	loc := m.cursor.location()
+	if loc.Kind == engine.Tableau {
+		cards := m.game.Tableau(loc.Pile)
+		if loc.Index < 0 || loc.Index >= len(cards) || !cards[loc.Index].FaceUp {
+			t.Fatalf("shift+tab focused non-playable tableau location: cursor=%+v cards=%+v", m.cursor, cards)
+		}
+	}
+}
+
+func TestNumberKeysJumpToTableauColumns(t *testing.T) {
+	m := testModel(t)
+	m, _ = m.Update(key("4"))
+	if m.cursor.region != regionTableau || m.cursor.col != 3 {
+		t.Fatalf("4 should jump to tableau column 4, cursor=%+v", m.cursor)
+	}
 }
 
 func setUnexported(field reflect.Value, value any) {
