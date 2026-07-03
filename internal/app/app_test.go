@@ -61,7 +61,7 @@ func TestLauncherSelectsSolitaireModel(t *testing.T) {
 		t.Fatalf("view = %v, want viewSolitaire", a.view)
 	}
 	view := a.View()
-	if !strings.Contains(view, "SOLITAIRE") || !strings.Contains(view, "Stock") {
+	if !strings.Contains(view, "SOLITAIRE DRAW 3") || !strings.Contains(view, "Stock") {
 		t.Fatalf("Solitaire model did not render:\n%s", view)
 	}
 	if strings.Contains(view, "Draw 3 coming next") {

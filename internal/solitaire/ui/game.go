@@ -37,6 +37,7 @@ type Model struct {
 	tickGen      int
 	tickSession  uint64
 	termW        int
+	termH        int
 	message      string
 	showHelp     bool
 	newBestTime  bool
@@ -70,7 +71,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.running = false
 		return m, nil
 	case tea.WindowSizeMsg:
-		m.termW = msg.Width
+		m.termW, m.termH = msg.Width, msg.Height
 		return m, nil
 	case tea.KeyMsg:
 		if m.showHelp {
@@ -119,6 +120,7 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		}
 		fresh.tickGen = m.tickGen + 1
 		fresh.termW = m.termW
+		fresh.termH = m.termH
 		return fresh, nil
 	case "left", "h":
 		m.moveCursorLeft()
@@ -281,70 +283,210 @@ func (m *Model) clampTableauRow() {
 }
 
 func (m Model) View() string {
+	if m.tooSmall() {
+		return m.tooSmallView()
+	}
 	if m.showHelp {
-		return "SOLITAIRE HELP\n\n←/h ↑/k ↓/j →/l move · d draw · enter select/move · a auto-foundation · n new deal · esc back"
+		return m.helpView()
 	}
 	var b strings.Builder
-	b.WriteString("SOLITAIRE\n\n")
-	b.WriteString(fmt.Sprintf("Time %03d · Moves %d\n", m.elapsed, m.game.Moves()))
-	b.WriteString(fmt.Sprintf("Stock %d · Waste %d\n", m.game.StockCount(), len(m.game.WasteVisible())))
-	b.WriteString("Foundations")
-	for suit := engine.Spades; suit <= engine.Clubs; suit++ {
-		card, ok := m.game.FoundationTop(suit)
-		if ok {
-			b.WriteString(fmt.Sprintf(" %s", cardText(card)))
-		} else {
-			b.WriteString(" --")
-		}
-	}
-	b.WriteString("\nTableau")
-	for col := range 7 {
-		b.WriteString(fmt.Sprintf(" %d:%d", col+1, len(m.game.Tableau(col))))
-	}
-	if m.selected != nil {
-		b.WriteString("\nSelected")
-	}
-	if m.message != "" {
-		b.WriteString("\n" + m.message)
-	}
-	if m.game.Status() == engine.Won {
-		b.WriteString("\nYou won")
-		if m.newBestTime {
-			b.WriteString(" · best time")
-		}
-		if m.newBestMoves {
-			b.WriteString(" · fewest moves")
-		}
-		if m.saveErr {
-			b.WriteString(" · score save failed")
-		}
-	}
-	b.WriteString("\n\n? help · d draw · enter select · a auto · n new · esc menu")
+	b.WriteString(styleTitle.Render(fitLine(m.termW,
+		fmt.Sprintf(" SOLITAIRE DRAW 3      ⏱ %03d   moves %03d", m.elapsed, m.game.Moves()),
+		fmt.Sprintf(" SOLITAIRE DRAW 3   %03d/%03d", m.elapsed, m.game.Moves()),
+	)))
+	b.WriteString("\n\n")
+	b.WriteString(m.topView())
+	b.WriteString("\n\n")
+	b.WriteString(m.tableauView())
+	b.WriteString("\n\n")
+	b.WriteString(m.statusLine())
 	return b.String()
 }
 
-func cardText(card engine.Card) string {
-	rank := fmt.Sprintf("%d", card.Rank)
-	switch card.Rank {
-	case engine.Ace:
-		rank = "A"
-	case engine.Jack:
-		rank = "J"
-	case engine.Queen:
-		rank = "Q"
-	case engine.King:
-		rank = "K"
+func (m Model) tooSmall() bool {
+	return (m.termW > 0 && m.termW < solitaireMinCols) || (m.termH > 0 && m.termH < solitaireMinRows)
+}
+
+func (m Model) tooSmallView() string {
+	full := []string{
+		"",
+		" Terminal too small.",
+		fmt.Sprintf(" need %d×%d", solitaireMinCols, solitaireMinRows),
+		fmt.Sprintf(" have %d×%d", m.termW, m.termH),
+		" press m for menu.",
+		"",
 	}
-	suit := "?"
-	switch card.Suit {
+	compact := []string{
+		"too small",
+		fmt.Sprintf("need %d×%d", solitaireMinCols, solitaireMinRows),
+		fmt.Sprintf("have %d×%d", m.termW, m.termH),
+		"m: menu",
+	}
+	var lines []string
+	switch {
+	case allFit(full, m.termW) && (m.termH <= 0 || len(full) <= m.termH):
+		lines = full
+	case allFit(full[1:5], m.termW) && (m.termH <= 0 || len(full)-2 <= m.termH):
+		lines = full[1:5]
+	case allFit(compact, m.termW) && (m.termH <= 0 || len(compact) <= m.termH):
+		lines = compact
+	case m.termH != 1:
+		lines = []string{compact[0], compact[3]}
+	default:
+		lines = compact[:1]
+	}
+	for i, l := range lines {
+		lines[i] = clampLine(l, m.termW)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) topView() string {
+	var b strings.Builder
+	b.WriteString(" Stock        Waste             Foundations\n ")
+	stock := emptyToken(" · ")
+	if m.game.StockCount() > 0 {
+		stock = hiddenToken()
+	}
+	b.WriteString(m.decorate(regionStock, 0, 0, stock))
+	b.WriteString("          ")
+	waste := m.game.WasteVisible()
+	for range 3 - len(waste) {
+		b.WriteString(emptyToken(" · "))
+		b.WriteString(" ")
+	}
+	for i, card := range waste {
+		token := styledCard(card)
+		if i == len(waste)-1 {
+			token = m.decorate(regionWaste, 0, 0, token)
+		}
+		b.WriteString(token)
+		b.WriteString(" ")
+	}
+	b.WriteString("      ")
+	for suit := engine.Spades; suit <= engine.Clubs; suit++ {
+		token := emptyToken("·" + suitGlyph(suit) + " ")
+		if card, ok := m.game.FoundationTop(suit); ok {
+			token = styledCard(card)
+		}
+		b.WriteString(m.decorate(regionFoundation, int(suit), 0, token))
+		b.WriteString(" ")
+	}
+	return b.String()
+}
+
+func (m Model) tableauView() string {
+	var b strings.Builder
+	b.WriteString(" Tableau\n")
+	b.WriteString("   1     2     3     4     5     6     7\n")
+	maxRows := 0
+	cols := make([][]engine.TableauCard, 7)
+	for col := range 7 {
+		cols[col] = m.game.Tableau(col)
+		if len(cols[col]) > maxRows {
+			maxRows = len(cols[col])
+		}
+	}
+	for row := range maxRows {
+		for col := range 7 {
+			token := "   "
+			if row < len(cols[col]) {
+				card := cols[col][row]
+				if card.FaceUp {
+					token = styledCard(card.Card)
+				} else {
+					token = hiddenToken()
+				}
+				token = m.decorate(regionTableau, col, row, token)
+			}
+			b.WriteString(" ")
+			b.WriteString(token)
+			b.WriteString("  ")
+		}
+		if row < maxRows-1 {
+			b.WriteString("\n")
+		}
+	}
+	return b.String()
+}
+
+func (m Model) statusLine() string {
+	if m.game.Status() == engine.Won {
+		full := fmt.Sprintf(" 😎 Solved in %ds · %d moves", m.elapsed, m.game.Moves())
+		compact := fmt.Sprintf(" 😎 Solved %ds · %d moves", m.elapsed, m.game.Moves())
+		if m.newBestTime || m.newBestMoves {
+			full += " — NEW BEST!"
+			compact += " — BEST!"
+		}
+		if m.saveErr {
+			full += styleErr.Render(" (save failed)")
+			compact += styleErr.Render(" (save failed)")
+		}
+		full += styleFaint.Render(" · n new · m menu")
+		return fitLine(m.termW, full, compact)
+	}
+	if m.message != "" {
+		return styleErr.Render(" " + clampLine(m.message, m.termW-1))
+	}
+	if m.selected != nil {
+		return fitLine(m.termW,
+			styleFaint.Render(" selected · choose destination · esc cancel"),
+			styleFaint.Render(" selected · esc cancel"),
+		)
+	}
+	return fitLine(m.termW,
+		styleFaint.Render(" spc select/move · d draw · a foundation · n new · m menu · ? help"),
+		styleFaint.Render(" spc select · d draw · ? help"),
+	)
+}
+
+func (m Model) helpView() string {
+	lines := []string{
+		" Solitaire Draw 3",
+		"",
+		" hjkl/arrows  move",
+		" spc/enter    select card or move selection",
+		" d            draw 3 / recycle stock",
+		" a            move focused/selected card to foundation",
+		" esc          cancel selection / menu",
+		" n            new deal",
+		" m            menu",
+		" q            quit",
+		"",
+		" any key to close help",
+	}
+	for i, l := range lines {
+		lines[i] = styleFaint.Render(clampLine(l, m.termW))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) decorate(r region, col, row int, token string) string {
+	if m.cursor.region == r && m.cursor.col == col && m.cursor.row == row {
+		return styleCursor.Render(token)
+	}
+	if m.selected != nil && r == regionTableau && m.selected.Kind == engine.Tableau &&
+		m.selected.Pile == col && row >= m.selected.Index {
+		return styleSelected.Render(token)
+	}
+	if m.selected != nil && r == regionWaste && m.selected.Kind == engine.Waste {
+		return styleSelected.Render(token)
+	}
+	if m.selected != nil && r == regionFoundation && m.selected.Kind == engine.Foundation && m.selected.Pile == col {
+		return styleSelected.Render(token)
+	}
+	return token
+}
+
+func suitGlyph(suit engine.Suit) string {
+	switch suit {
 	case engine.Spades:
-		suit = "S"
+		return "♠"
 	case engine.Hearts:
-		suit = "H"
+		return "♥"
 	case engine.Diamonds:
-		suit = "D"
-	case engine.Clubs:
-		suit = "C"
+		return "♦"
+	default:
+		return "♣"
 	}
-	return rank + suit
 }
