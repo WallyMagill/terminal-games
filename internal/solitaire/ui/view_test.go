@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -53,6 +54,27 @@ func TestViewShowsTooSmallGuardWhenWidthCannotFitLayout(t *testing.T) {
 		t.Fatalf("narrow view should show the too-small guard:\n%s", v)
 	}
 	checkSolitaireLinesFit(t, "too-small guard", v, 24)
+}
+
+func TestViewHeightGuardAccountsForTallTableau(t *testing.T) {
+	m := testModel(t)
+	m.termW = solitaireMinCols
+	m.termH = solitaireMinRows
+
+	initial := m.View()
+	if strings.Contains(initial, "too small") {
+		t.Fatalf("initial minimum-size view should render the normal board:\n%s", initial)
+	}
+	if !strings.Contains(initial, "Tableau") {
+		t.Fatalf("initial minimum-size view should include tableau:\n%s", initial)
+	}
+
+	setTableauRows(t, m.game, 8)
+
+	tall := m.View()
+	if !strings.Contains(tall, "too small") {
+		t.Fatalf("tall tableau at minimum height should show the too-small guard:\n%s", tall)
+	}
 }
 
 func TestStatusLineUsesCompactHintAtMinimumWidth(t *testing.T) {
@@ -164,6 +186,18 @@ func firstFaceUpTableauCard(t *testing.T, m Model) (int, int, engine.Card) {
 	}
 	t.Fatal("test deal has no face-up tableau cards")
 	return 0, 0, engine.Card{}
+}
+
+func setTableauRows(t *testing.T, g *engine.Game, rows int) {
+	t.Helper()
+	var tableau [7][]engine.TableauCard
+	for row := range rows {
+		tableau[0] = append(tableau[0], engine.TableauCard{
+			Card:   engine.Card{Rank: engine.Rank(row%int(engine.King) + 1), Suit: engine.Suit(row % 4)},
+			FaceUp: true,
+		})
+	}
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("tableau"), tableau)
 }
 
 func checkSolitaireLinesFit(t *testing.T, ctx, view string, termW int) {

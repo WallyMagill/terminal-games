@@ -304,21 +304,40 @@ func (m Model) View() string {
 }
 
 func (m Model) tooSmall() bool {
-	return (m.termW > 0 && m.termW < solitaireMinCols) || (m.termH > 0 && m.termH < solitaireMinRows)
+	requiredRows := m.requiredRows()
+	return (m.termW > 0 && m.termW < solitaireMinCols) || (m.termH > 0 && m.termH < requiredRows)
+}
+
+func (m Model) requiredRows() int {
+	extraTableauRows := m.maxTableauRows() - 7
+	if extraTableauRows <= 0 {
+		return solitaireMinRows
+	}
+	return solitaireMinRows + extraTableauRows
+}
+
+func (m Model) maxTableauRows() int {
+	maxRows := 0
+	for col := range 7 {
+		if rows := len(m.game.Tableau(col)); rows > maxRows {
+			maxRows = rows
+		}
+	}
+	return maxRows
 }
 
 func (m Model) tooSmallView() string {
 	full := []string{
 		"",
 		" Terminal too small.",
-		fmt.Sprintf(" need %d×%d", solitaireMinCols, solitaireMinRows),
+		fmt.Sprintf(" need %d×%d", solitaireMinCols, m.requiredRows()),
 		fmt.Sprintf(" have %d×%d", m.termW, m.termH),
 		" press m for menu.",
 		"",
 	}
 	compact := []string{
 		"too small",
-		fmt.Sprintf("need %d×%d", solitaireMinCols, solitaireMinRows),
+		fmt.Sprintf("need %d×%d", solitaireMinCols, m.requiredRows()),
 		fmt.Sprintf("have %d×%d", m.termW, m.termH),
 		"m: menu",
 	}
