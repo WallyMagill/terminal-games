@@ -83,6 +83,26 @@ func TestLauncherShowsSolitaireTooSmallWhenAppChromeWouldOverflow(t *testing.T) 
 	}
 }
 
+func TestSolitaireTooSmallViewFitsUltraShortAppHeight(t *testing.T) {
+	a := New(store.New(t.TempDir() + "/scores.json"))
+	model, _ := a.Update(tea.WindowSizeMsg{Width: 48, Height: 4})
+	a = model.(App)
+	model, _ = a.Update(launcherSelectMsg{item: launcherSolitaire})
+	a = model.(App)
+
+	view := a.View()
+	if !strings.Contains(view, "press m for menu") {
+		t.Fatalf("Solitaire too-small view should keep menu hint visible:\n%s", view)
+	}
+	lines := strings.Split(strings.TrimSuffix(view, "\n"), "\n")
+	if len(lines) > 4 {
+		t.Fatalf("Solitaire too-small view rendered %d rows, want <= 4:\n%s", len(lines), view)
+	}
+	if lines[0] == "" || lines[len(lines)-1] == "" {
+		t.Fatalf("Solitaire too-small view should not be wrapped in blank app chrome:\n%q", view)
+	}
+}
+
 func TestMinesMenuEscReturnsToLauncher(t *testing.T) {
 	a := testApp(t)
 	model, _ := a.Update(key("enter"))

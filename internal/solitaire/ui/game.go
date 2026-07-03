@@ -308,6 +308,8 @@ func (m Model) tooSmall() bool {
 	return (m.termW > 0 && m.termW < solitaireMinCols) || (m.termH > 0 && m.termH < requiredRows)
 }
 
+func (m Model) TooSmall() bool { return m.tooSmall() }
+
 func (m Model) requiredRows() int {
 	extraTableauRows := m.maxTableauRows() - 7
 	if extraTableauRows <= 0 {

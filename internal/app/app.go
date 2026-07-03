@@ -126,7 +126,11 @@ func (a App) View() string {
 	case viewMines:
 		return a.mines.View()
 	case viewSolitaire:
-		return "\n" + a.solitaire.View() + "\n"
+		view := a.solitaire.View()
+		if a.solitaire.TooSmall() {
+			return view
+		}
+		return "\n" + view + "\n"
 	default:
 		return ""
 	}
