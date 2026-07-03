@@ -27,29 +27,31 @@ func tickCmd(session uint64, gen int) tea.Cmd {
 }
 
 type Model struct {
-	game          *engine.Game
-	scores        *store.Store
-	rng           *legacyrand.Rand
-	cursor        cursor
-	selected      *engine.Location
-	selectedMoves []engine.Move
-	elapsed       int
-	running       bool
-	tickGen       int
-	tickSession   uint64
-	termW         int
-	termH         int
-	message       string
-	showHelp      bool
-	newBestTime   bool
-	newBestMoves  bool
-	saveErr       bool
-	recordedWin   bool
-	bestSeconds   *int
-	fewestMoves   *int
-	undoStack     []*engine.Game
-	assisted      bool
-	assistReason  string
+	game              *engine.Game
+	scores            *store.Store
+	rng               *legacyrand.Rand
+	cursor            cursor
+	selected          *engine.Location
+	selectedMoves     []engine.Move
+	elapsed           int
+	running           bool
+	tickGen           int
+	tickSession       uint64
+	termW             int
+	termH             int
+	message           string
+	showHelp          bool
+	newBestTime       bool
+	newBestMoves      bool
+	saveErr           bool
+	recordedWin       bool
+	bestSeconds       *int
+	fewestMoves       *int
+	undoStack         []*engine.Game
+	assisted          bool
+	assistReason      string
+	stockPassProgress bool
+	stockPassWarning  bool
 }
 
 func NewModel(scores *store.Store, rng *legacyrand.Rand) (Model, error) {
@@ -146,6 +148,8 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		return m.autoFoundation()
 	case "A":
 		return m.autoFoundationAll()
+	case "h":
+		return m.hint(), nil
 	case "u":
 		return m.undo()
 	case "tab":
@@ -182,7 +186,7 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		fresh.termW = m.termW
 		fresh.termH = m.termH
 		return fresh, nil
-	case "left", "h":
+	case "left":
 		m.moveCursorLeft()
 	case "right", "l":
 		m.moveCursorRight()
@@ -196,16 +200,33 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 
 func (m Model) draw() (Model, tea.Cmd) {
 	before := m.game.Clone()
+	beforeStock := m.game.StockCount()
 	changed := m.game.Draw()
 	if changed {
 		m.undoStack = append(m.undoStack, before)
 		m = m.clearSelection()
-		m.message = "Drew cards"
+		if beforeStock == 0 {
+			m.stockPassWarning = !m.stockPassProgress
+			m.stockPassProgress = false
+		}
+		if m.stockPassWarning {
+			m.message = noProgressMessage
+		} else {
+			m.message = "Drew cards"
+		}
 	} else {
 		m.message = "No cards to draw"
 	}
 	m.recordWinIfNeeded()
 	return m.startTimerIfNeeded(changed)
+}
+
+const noProgressMessage = "No progress this stock pass — move a card before cycling again"
+
+func (m Model) noteCardProgress() Model {
+	m.stockPassProgress = true
+	m.stockPassWarning = false
+	return m
 }
 
 func (m Model) activate() (Model, tea.Cmd) {
@@ -231,6 +252,7 @@ func (m Model) activate() (Model, tea.Cmd) {
 			if changed {
 				m.undoStack = append(m.undoStack, before)
 				m.message = "Moved"
+				m = m.noteCardProgress()
 			} else {
 				m.message = "Invalid move"
 			}
@@ -256,6 +278,7 @@ func (m Model) activate() (Model, tea.Cmd) {
 	if changed {
 		m.undoStack = append(m.undoStack, before)
 		m.message = "Moved"
+		m = m.noteCardProgress()
 	} else {
 		m.message = "Invalid move"
 	}
@@ -294,6 +317,7 @@ func (m Model) autoFoundation() (Model, tea.Cmd) {
 		m.undoStack = append(m.undoStack, before)
 		m = m.clearSelection()
 		m.message = "Moved to foundation"
+		m = m.noteCardProgress()
 	} else {
 		m.message = "No safe foundation move"
 	}
@@ -329,6 +353,7 @@ func (m Model) autoFoundationAll() (Model, tea.Cmd) {
 	}
 	m.undoStack = append(m.undoStack, before)
 	m = m.clearSelection()
+	m = m.noteCardProgress()
 	m.message = "Moved safe cards to foundation"
 	m.recordWinIfNeeded()
 	return m.startTimerIfNeeded(true)
@@ -697,9 +722,10 @@ func (m Model) helpView() string {
 	lines := []string{
 		" Solitaire Draw 3",
 		"",
-		" hjkl/arrows  move",
+		" arrows/jkl   move",
 		" spc/enter    select card or move selection",
 		" d            draw 3 / recycle stock",
+		" h            hint",
 		" a            move focused/selected safe card to foundation",
 		" A            auto-foundation all safe cards",
 		" esc          cancel selection / menu",

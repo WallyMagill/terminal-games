@@ -99,6 +99,83 @@ func (m Model) selectedMoveTo(dst engine.Location) (engine.Move, bool) {
 	return engine.Move{}, false
 }
 
+func (m Model) hint() Model {
+	m.assisted = true
+	m.assistReason = "hint"
+	m = m.clearSelection()
+	move, ok := m.bestHintMove()
+	if !ok {
+		m.message = "Hint: no productive move found"
+		return m
+	}
+	m = m.focusLocation(move.Source)
+	m.message = "Hint: " + m.describeHintMove(move)
+	return m
+}
+
+func (m Model) bestHintMove() (engine.Move, bool) {
+	bestRank := 7
+	var best engine.Move
+	for _, move := range m.game.LegalMoves() {
+		rank := hintRank(move)
+		if rank < bestRank {
+			bestRank = rank
+			best = move
+		}
+	}
+	if bestRank == 7 {
+		return engine.Move{}, false
+	}
+	return best, true
+}
+
+func hintRank(move engine.Move) int {
+	if move.Source.Kind == engine.Tableau && move.RevealsCard {
+		return 1
+	}
+	if move.Destination.Kind == engine.Foundation && move.Safe {
+		return 2
+	}
+	switch move.Kind {
+	case engine.MoveWasteToTableau:
+		return 3
+	case engine.MoveTableauToTableau:
+		return 4
+	case engine.MoveDraw:
+		return 5
+	case engine.MoveRecycle:
+		return 6
+	default:
+		return 7
+	}
+}
+
+func (m Model) describeHintMove(move engine.Move) string {
+	switch move.Kind {
+	case engine.MoveDraw:
+		return "draw from stock"
+	case engine.MoveRecycle:
+		return "recycle waste into stock"
+	}
+	source := describeLocation(move.Source)
+	card, stackLen, ok := m.cardAt(move.Source)
+	if !ok {
+		return fmt.Sprintf("move from %s to %s", source, describeLocation(move.Destination))
+	}
+	cardText := describeCard(card)
+	if stackLen > 1 {
+		cardText = fmt.Sprintf("%s stack (%d cards)", cardText, stackLen)
+	}
+	hint := fmt.Sprintf("move %s from %s to %s", cardText, source, describeLocation(move.Destination))
+	if move.Source.Kind == engine.Tableau && move.RevealsCard {
+		return hint + " to reveal a card"
+	}
+	if move.Destination.Kind == engine.Foundation && move.Safe {
+		return hint + " safely"
+	}
+	return hint
+}
+
 func matchesSelectedDestination(moveDst, cursorDst engine.Location) bool {
 	if moveDst.Kind == engine.Tableau && cursorDst.Kind == engine.Tableau {
 		return moveDst.Pile == cursorDst.Pile

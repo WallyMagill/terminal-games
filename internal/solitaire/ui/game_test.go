@@ -3,6 +3,7 @@ package ui
 import (
 	legacyrand "math/rand"
 	"reflect"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -427,6 +428,35 @@ func TestSafeAutoFoundationMovesAllSafeCardsWithoutAssistedFlag(t *testing.T) {
 	}
 }
 
+func TestHintMarksAssistedAndDoesNotMutateGame(t *testing.T) {
+	m := testModel(t)
+	beforeMoves := m.game.Moves()
+	beforeStock := m.game.StockCount()
+	m, _ = m.Update(key("h"))
+	if !m.assisted {
+		t.Fatal("hint should mark game assisted")
+	}
+	if m.game.Moves() != beforeMoves || m.game.StockCount() != beforeStock {
+		t.Fatalf("hint should not mutate game, moves %d->%d stock %d->%d", beforeMoves, m.game.Moves(), beforeStock, m.game.StockCount())
+	}
+	if !strings.Contains(m.message, "Hint:") {
+		t.Fatalf("hint should set explanatory message, got %q", m.message)
+	}
+}
+
+func TestNoProgressWarningAfterStockPassWithoutProgress(t *testing.T) {
+	m := modelWithOnlyStockCycle(t)
+	for range 10 {
+		m, _ = m.Update(key("d"))
+	}
+	if !strings.Contains(strings.ToLower(m.message), "no progress") {
+		t.Fatalf("expected no-progress warning after stock pass, got %q", m.message)
+	}
+	if m.assisted {
+		t.Fatal("no-progress warning should not mark assisted")
+	}
+}
+
 func TestSafeAutoFoundationDoesNotMoveUnsafeHigherCard(t *testing.T) {
 	m := modelWithUnsafeHeartFive(t)
 	m, _ = m.Update(key("A"))
@@ -689,6 +719,20 @@ func modelWithUnsafeHeartFive(t *testing.T) Model {
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("foundations"), foundations)
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
+	m.game = g
+	return m
+}
+
+func modelWithOnlyStockCycle(t *testing.T) Model {
+	t.Helper()
+	m := testModel(t)
+	g := &engine.Game{}
+	var stock []engine.Card
+	for range 24 {
+		stock = append(stock, engine.Card{Rank: engine.King, Suit: engine.Spades})
+	}
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("status"), engine.Playing)
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), stock)
 	m.game = g
 	return m
 }
