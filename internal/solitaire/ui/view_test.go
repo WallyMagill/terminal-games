@@ -64,6 +64,36 @@ func TestStatusLineUsesCompactHintAtMinimumWidth(t *testing.T) {
 	checkSolitaireLinesFit(t, "minimum status", m.View(), solitaireMinCols)
 }
 
+func TestSelectedStatusLineTakesPriorityOverMessage(t *testing.T) {
+	m := testModel(t)
+	m, _ = m.Update(key(" "))
+	v := m.View()
+	if !strings.Contains(v, "selected · choose destination") {
+		t.Fatalf("selected view should show destination guidance:\n%s", v)
+	}
+	if strings.Contains(v, "\n Selected") {
+		t.Fatalf("selected view should not show the generic selected message:\n%s", v)
+	}
+}
+
+func TestWonCompactStatusKeepsNavigationHints(t *testing.T) {
+	m := testModel(t)
+	m.game = oneMoveFromWin(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m.elapsed = 999
+	m.termW = solitaireMinCols
+	m, _ = m.Update(key("a"))
+	status := m.statusLine()
+	for _, want := range []string{"BEST", "n new", "m menu"} {
+		if !strings.Contains(status, want) {
+			t.Fatalf("won compact status missing %q in %q", want, status)
+		}
+	}
+	if w := lipgloss.Width(status); w > solitaireMinCols {
+		t.Fatalf("won compact status is %d cols, max %d: %q", w, solitaireMinCols, status)
+	}
+}
+
 func TestViewDecoratesFocusedStock(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	m := testModel(t)

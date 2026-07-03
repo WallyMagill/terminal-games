@@ -413,7 +413,7 @@ func (m Model) tableauView() string {
 func (m Model) statusLine() string {
 	if m.game.Status() == engine.Won {
 		full := fmt.Sprintf(" 😎 Solved in %ds · %d moves", m.elapsed, m.game.Moves())
-		compact := fmt.Sprintf(" 😎 Solved %ds · %d moves", m.elapsed, m.game.Moves())
+		compact := fmt.Sprintf(" 😎 %ds · %d moves", m.elapsed, m.game.Moves())
 		if m.newBestTime || m.newBestMoves {
 			full += " — NEW BEST!"
 			compact += " — BEST!"
@@ -422,17 +422,19 @@ func (m Model) statusLine() string {
 			full += styleErr.Render(" (save failed)")
 			compact += styleErr.Render(" (save failed)")
 		}
-		full += styleFaint.Render(" · n new · m menu")
+		nav := styleFaint.Render(" · n new · m menu")
+		full += nav
+		compact += nav
 		return fitLine(m.termW, full, compact)
-	}
-	if m.message != "" {
-		return styleErr.Render(" " + clampLine(m.message, m.termW-1))
 	}
 	if m.selected != nil {
 		return fitLine(m.termW,
 			styleFaint.Render(" selected · choose destination · esc cancel"),
 			styleFaint.Render(" selected · esc cancel"),
 		)
+	}
+	if m.message != "" {
+		return styleErr.Render(" " + clampLine(m.message, m.termW-1))
 	}
 	return fitLine(m.termW,
 		styleFaint.Render(" spc select/move · d draw · a foundation · n new · m menu · ? help"),

@@ -69,6 +69,20 @@ func TestLauncherSelectsSolitaireModel(t *testing.T) {
 	}
 }
 
+func TestLauncherShowsSolitaireTooSmallWhenAppChromeWouldOverflow(t *testing.T) {
+	a := New(store.New(t.TempDir() + "/scores.json"))
+	model, _ := a.Update(tea.WindowSizeMsg{Width: 48, Height: 16})
+	a = model.(App)
+	model, _ = a.Update(key("down"))
+	a = model.(App)
+	model, _ = a.Update(key("enter"))
+	a = model.(App)
+	v := a.View()
+	if !strings.Contains(v, "too small") {
+		t.Fatalf("Solitaire should reject terminal height that cannot fit app chrome:\n%s", v)
+	}
+}
+
 func TestMinesMenuEscReturnsToLauncher(t *testing.T) {
 	a := testApp(t)
 	model, _ := a.Update(key("enter"))

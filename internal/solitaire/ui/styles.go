@@ -10,7 +10,7 @@ import (
 
 const (
 	solitaireMinCols = 48
-	solitaireMinRows = 16
+	solitaireMinRows = 18
 )
 
 var (
