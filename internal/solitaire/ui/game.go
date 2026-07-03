@@ -417,11 +417,9 @@ func (m Model) statusLine() string {
 		if m.saveErr {
 			compact = fmt.Sprintf(" 😎 %ds · %dm", m.elapsed, m.game.Moves())
 		}
-		if m.newBestTime || m.newBestMoves {
+		if (m.newBestTime || m.newBestMoves) && !m.saveErr {
 			full += " — NEW BEST!"
-			if !m.saveErr {
-				compact += " — BEST!"
-			}
+			compact += " — BEST!"
 		}
 		if m.saveErr {
 			full += styleErr.Render(" (save failed)")

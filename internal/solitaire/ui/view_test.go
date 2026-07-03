@@ -113,6 +113,25 @@ func TestWonCompactSaveErrorStatusFitsMinimumWidth(t *testing.T) {
 	}
 }
 
+func TestWonWideSaveErrorStatusDoesNotCelebrateUnsavedBest(t *testing.T) {
+	m := testModel(t)
+	m.game = oneMoveFromWin(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m.elapsed = 999
+	m.termW = 120
+	m, _ = m.Update(key("a"))
+	m.saveErr = true
+	status := m.statusLine()
+	for _, want := range []string{"Solved in", "save failed", "n new", "m menu"} {
+		if !strings.Contains(status, want) {
+			t.Fatalf("wide save-error status missing %q in %q", want, status)
+		}
+	}
+	if strings.Contains(status, "NEW BEST") {
+		t.Fatalf("wide save-error status should not celebrate an unsaved best: %q", status)
+	}
+}
+
 func TestViewDecoratesFocusedStock(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	m := testModel(t)
