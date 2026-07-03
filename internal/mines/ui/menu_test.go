@@ -49,18 +49,23 @@ func TestMenuSelectPresetEmitsStartGame(t *testing.T) {
 	}
 }
 
-// q and esc on the menu list are direct quit bindings, independent of the
-// Quit row that TestMenuQuit selects with enter.
-func TestMenuQAndEscQuitDirectly(t *testing.T) {
-	for _, k := range []tea.KeyMsg{key("q"), {Type: tea.KeyEsc}} {
-		m := testMenu()
-		_, cmd := m.Update(k)
-		if cmd == nil {
-			t.Fatalf("%s on the menu list must quit", k)
-		}
-		if _, ok := cmd().(tea.QuitMsg); !ok {
-			t.Errorf("%s should produce tea.QuitMsg", k)
-		}
+func TestMenuQQuitsAndEscRequestsLauncherBack(t *testing.T) {
+	m := testMenu()
+	_, cmd := m.Update(key("q"))
+	if cmd == nil {
+		t.Fatal("q on the menu list must quit")
+	}
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Error("q should produce tea.QuitMsg")
+	}
+
+	m = testMenu()
+	_, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("esc on the menu list must request launcher back")
+	}
+	if _, ok := cmd().(BackMsg); !ok {
+		t.Error("esc should produce BackMsg")
 	}
 }
 

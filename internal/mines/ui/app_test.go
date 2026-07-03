@@ -121,6 +121,18 @@ func TestAppCtrlCQuits(t *testing.T) {
 	}
 }
 
+func TestMenuEscRequestsLauncherBack(t *testing.T) {
+	a := testApp(t)
+	_, cmd := a.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("esc on Mines menu should request launcher back")
+	}
+	if _, ok := cmd().(BackMsg); !ok {
+		t.Fatal("esc on Mines menu should produce BackMsg")
+	}
+}
+
+
 func TestAppTooSmallTerminal(t *testing.T) {
 	a := testApp(t)
 	model, _ := a.Update(startGameMsg{preset: presets[2]}) // Expert: 30 wide → needs 91 cols
@@ -355,21 +367,10 @@ func TestAppQKeyQuitsFromGame(t *testing.T) {
 }
 
 // Pins the view-scoping of the App's m/esc/q interception (a.view ==
-// viewGame): on the menu those keys belong to the focused view, so through
-// the real App.Update path esc on the menu list quits (not eaten by the
-// interception), q in the custom form is a non-digit no-op (not quit), and
+// viewGame): q in the custom form is a non-digit no-op (not quit), and
 // esc in the form closes it without losing the typed input.
 func TestAppMenuKeysNotInterceptedByGameSwitch(t *testing.T) {
 	a := testApp(t)
-	_, cmd := a.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	if cmd == nil {
-		t.Fatal("esc on the menu list through the App must quit")
-	}
-	if _, ok := cmd().(tea.QuitMsg); !ok {
-		t.Error("esc on the menu list should produce tea.QuitMsg")
-	}
-
-	a = testApp(t)
 	for i := 0; i < 3; i++ {
 		a, _ = updApp(t, a, key("j"))
 	}
@@ -378,7 +379,7 @@ func TestAppMenuKeysNotInterceptedByGameSwitch(t *testing.T) {
 		t.Fatal("enter on Custom should open the form")
 	}
 	a, _ = updApp(t, a, key("9"))
-	_, cmd = a.Update(key("q"))
+	_, cmd := a.Update(key("q"))
 	if cmd != nil {
 		if _, ok := cmd().(tea.QuitMsg); ok {
 			t.Error("q while the custom form is open must be ignored as a non-digit, not quit")

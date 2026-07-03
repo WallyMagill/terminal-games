@@ -10,6 +10,13 @@ import (
 	"github.com/wallymagill/mines/internal/store"
 )
 
+// BackMsg asks the root launcher to leave the Minesweeper sub-app.
+type BackMsg struct{}
+
+func backToLauncher() tea.Cmd {
+	return func() tea.Msg { return BackMsg{} }
+}
+
 type view int
 
 const (

@@ -79,7 +79,9 @@ func (m menuModel) handleListKey(k string) (menuModel, tea.Cmd) {
 		default:
 			return m, tea.Quit
 		}
-	case "q", "esc":
+	case "m", "esc":
+		return m, backToLauncher()
+	case "q":
 		return m, tea.Quit
 	}
 	return m, nil
