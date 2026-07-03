@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/engine"
+	"github.com/wallymagill/mines/internal/mines/engine"
 )
 
 // Bubble Tea's input parser collects the longest run of printable runes from

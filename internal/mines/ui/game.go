@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/wallymagill/mines/internal/engine"
+	"github.com/wallymagill/mines/internal/mines/engine"
 	"github.com/wallymagill/mines/internal/store"
 )
 

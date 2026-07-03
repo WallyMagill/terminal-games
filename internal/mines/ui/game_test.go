@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/engine"
+	"github.com/wallymagill/mines/internal/mines/engine"
 	"github.com/wallymagill/mines/internal/store"
 )
 

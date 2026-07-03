@@ -1,4 +1,4 @@
-mines
+/mines
 *.test
 coverage.out
 .claude/
