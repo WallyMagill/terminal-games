@@ -62,7 +62,7 @@ func (m Model) cycleSelectedDestination(direction int) Model {
 	current := m.cursor.location()
 	index := -1
 	for i, move := range m.selectedMoves {
-		if move.Destination == current {
+		if matchesSelectedDestination(move.Destination, current) {
 			index = i
 			break
 		}
@@ -79,11 +79,18 @@ func (m Model) cycleSelectedDestination(direction int) Model {
 
 func (m Model) selectedMoveTo(dst engine.Location) (engine.Move, bool) {
 	for _, move := range m.selectedMoves {
-		if move.Destination == dst {
+		if matchesSelectedDestination(move.Destination, dst) {
 			return move, true
 		}
 	}
 	return engine.Move{}, false
+}
+
+func matchesSelectedDestination(moveDst, cursorDst engine.Location) bool {
+	if moveDst.Kind == engine.Tableau && cursorDst.Kind == engine.Tableau {
+		return moveDst.Pile == cursorDst.Pile
+	}
+	return moveDst == cursorDst
 }
 
 func (m Model) clearSelection() Model {

@@ -306,6 +306,33 @@ func TestEnterAppliesHighlightedDestinationCandidate(t *testing.T) {
 	}
 }
 
+func TestEnterAppliesManualNonEmptyTableauDestination(t *testing.T) {
+	m := modelWithMovableFourAndNonEmptyTableauDestinations(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m, _ = m.Update(key(" "))
+	if m.selected == nil {
+		t.Fatal("source with multiple destinations should stay selected")
+	}
+
+	dstPile := 1
+	dstCards := m.game.Tableau(dstPile)
+	m.cursor = cursor{region: regionTableau, col: dstPile, row: len(dstCards) - 1}
+	m, cmd := m.Update(key("enter"))
+	if cmd == nil || !m.running {
+		t.Fatal("manual tableau destination move should start timer")
+	}
+	if m.selected != nil {
+		t.Fatalf("manual tableau destination should clear selection after moving: %+v", *m.selected)
+	}
+	dstCards = m.game.Tableau(dstPile)
+	if got := dstCards[len(dstCards)-1].Card; got != (engine.Card{Rank: engine.Four, Suit: engine.Spades}) {
+		t.Fatalf("destination top = %+v, want moved four of spades", got)
+	}
+	if m.game.Moves() != 1 {
+		t.Fatalf("moves = %d, want 1", m.game.Moves())
+	}
+}
+
 func TestDrawRecyclesEmptyStock(t *testing.T) {
 	m := testModel(t)
 	for range 8 {
@@ -425,6 +452,28 @@ func modelWithMovableKingAndTwoEmptyColumns(t *testing.T) Model {
 		{{Card: engine.Card{Rank: engine.King, Suit: engine.Spades}, FaceUp: true}},
 		nil,
 		nil,
+	})
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
+	m.game = g
+	return m
+}
+
+func modelWithMovableFourAndNonEmptyTableauDestinations(t *testing.T) Model {
+	t.Helper()
+	m := testModel(t)
+	g := &engine.Game{}
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("status"), engine.Playing)
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("tableau"), [7][]engine.TableauCard{
+		{{Card: engine.Card{Rank: engine.Four, Suit: engine.Spades}, FaceUp: true}},
+		{
+			{Card: engine.Card{Rank: engine.Six, Suit: engine.Clubs}, FaceUp: true},
+			{Card: engine.Card{Rank: engine.Five, Suit: engine.Hearts}, FaceUp: true},
+		},
+		{
+			{Card: engine.Card{Rank: engine.Six, Suit: engine.Clubs}, FaceUp: true},
+			{Card: engine.Card{Rank: engine.Five, Suit: engine.Diamonds}, FaceUp: true},
+		},
 	})
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
