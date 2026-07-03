@@ -155,6 +155,23 @@ func TestTooSmallGuardMenuBypassesHiddenHelp(t *testing.T) {
 	}
 }
 
+func TestTooSmallGuardIgnoresGameplayKeys(t *testing.T) {
+	m := testModel(t)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 24, Height: 8})
+	beforeCursor := m.cursor
+	m, cmd := m.Update(key("d"))
+	if cmd != nil {
+		t.Fatal("too-small guard should not start gameplay timers")
+	}
+	if m.game.StockCount() != 24 || m.game.Moves() != 0 {
+		t.Fatalf("too-small guard allowed draw: stock=%d moves=%d", m.game.StockCount(), m.game.Moves())
+	}
+	m, _ = m.Update(key("l"))
+	if m.cursor != beforeCursor {
+		t.Fatalf("too-small guard allowed cursor movement: %+v -> %+v", beforeCursor, m.cursor)
+	}
+}
+
 func TestCursorMovesAcrossRegions(t *testing.T) {
 	m := testModel(t)
 	m, _ = m.Update(key("right"))

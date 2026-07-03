@@ -53,8 +53,13 @@ func (g *Game) Draw() bool {
 		if len(g.waste) == 0 {
 			return false
 		}
-		for i := len(g.waste) - 1; i >= 0; i-- {
-			g.stock = append(g.stock, g.waste[i])
+		for end := len(g.waste); end > 0; {
+			start := end - 3
+			if start < 0 {
+				start = 0
+			}
+			g.stock = append(g.stock, g.waste[start:end]...)
+			end = start
 		}
 		g.waste = nil
 		g.moves++

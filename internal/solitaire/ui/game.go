@@ -74,15 +74,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.termW, m.termH = msg.Width, msg.Height
 		return m, nil
 	case tea.KeyMsg:
-		if m.tooSmall() && !uiutil.IsRuneBatch(msg) {
-			switch msg.String() {
-			case "m", "esc":
-				m.showHelp = false
-				m.selected = nil
-				return m, back()
-			case "q":
-				return m, tea.Quit
+		if m.tooSmall() {
+			if !uiutil.IsRuneBatch(msg) {
+				switch msg.String() {
+				case "m", "esc":
+					m.showHelp = false
+					m.selected = nil
+					return m, back()
+				case "q":
+					return m, tea.Quit
+				}
 			}
+			return m, nil
 		}
 		if m.showHelp {
 			m.showHelp = false

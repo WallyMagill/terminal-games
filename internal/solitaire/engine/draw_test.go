@@ -52,6 +52,45 @@ func TestDrawRemainderAndRecycle(t *testing.T) {
 	}
 }
 
+func TestRecyclePreservesDrawThreeOrderAcrossPasses(t *testing.T) {
+	cards := []Card{
+		{Rank: Two, Suit: Spades},
+		{Rank: Three, Suit: Spades},
+		{Rank: Four, Suit: Spades},
+		{Rank: Five, Suit: Spades},
+		{Rank: Six, Suit: Spades},
+		{Rank: Seven, Suit: Spades},
+	}
+	g := &Game{stock: append([]Card(nil), cards...), status: Playing}
+
+	g.Draw()
+	firstPassFirstDraw := g.WasteVisible()
+	g.Draw()
+	firstPassSecondDraw := g.WasteVisible()
+	g.Draw()
+	g.Draw()
+	secondPassFirstDraw := g.WasteVisible()
+
+	if !sameCards(firstPassFirstDraw, secondPassFirstDraw) {
+		t.Fatalf("first draw after recycle = %v, want first-pass first draw %v", secondPassFirstDraw, firstPassFirstDraw)
+	}
+	if sameCards(firstPassSecondDraw, secondPassFirstDraw) {
+		t.Fatalf("first draw after recycle repeated second draw %v; want stock order preserved", secondPassFirstDraw)
+	}
+}
+
+func sameCards(a, b []Card) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestDrawReturnsFalseWhenStockAndWasteAreEmpty(t *testing.T) {
 	g := &Game{status: Playing}
 	if g.Draw() {
