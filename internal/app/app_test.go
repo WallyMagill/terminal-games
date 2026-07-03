@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	solitaireui "github.com/wallymagill/mines/internal/solitaire/ui"
 	"github.com/wallymagill/mines/internal/store"
 )
 
@@ -49,7 +50,7 @@ func TestLauncherSelectsMinesweeper(t *testing.T) {
 	}
 }
 
-func TestLauncherSelectsSolitaireTemporaryScreen(t *testing.T) {
+func TestLauncherSelectsSolitaireModel(t *testing.T) {
 	a := testApp(t)
 	model, _ := a.Update(key("down"))
 	a = model.(App)
@@ -58,8 +59,12 @@ func TestLauncherSelectsSolitaireTemporaryScreen(t *testing.T) {
 	if a.view != viewSolitaire {
 		t.Fatalf("view = %v, want viewSolitaire", a.view)
 	}
-	if !strings.Contains(a.View(), "SOLITAIRE") {
-		t.Fatalf("Solitaire temporary screen did not render:\n%s", a.View())
+	view := a.View()
+	if !strings.Contains(view, "SOLITAIRE") || !strings.Contains(view, "Stock") {
+		t.Fatalf("Solitaire model did not render:\n%s", view)
+	}
+	if strings.Contains(view, "Draw 3 coming next") {
+		t.Fatalf("Solitaire temporary screen still rendered:\n%s", view)
 	}
 }
 
@@ -87,7 +92,14 @@ func TestSolitaireEscReturnsToLauncher(t *testing.T) {
 	a = model.(App)
 	model, _ = a.Update(key("enter"))
 	a = model.(App)
-	model, _ = a.Update(key("esc"))
+	_, cmd := a.Update(key("esc"))
+	if cmd == nil {
+		t.Fatal("esc in Solitaire should request launcher back")
+	}
+	if _, ok := cmd().(solitaireui.BackMsg); !ok {
+		t.Fatal("esc in Solitaire should produce solitaire BackMsg")
+	}
+	model, _ = a.Update(solitaireui.BackMsg{})
 	a = model.(App)
 	if a.view != viewLauncher {
 		t.Fatalf("view = %v, want viewLauncher", a.view)

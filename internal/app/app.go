@@ -1,10 +1,12 @@
 package app
 
 import (
-	"strings"
+	legacyrand "math/rand"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	minesui "github.com/wallymagill/mines/internal/mines/ui"
+	solitaireui "github.com/wallymagill/mines/internal/solitaire/ui"
 	"github.com/wallymagill/mines/internal/store"
 	"github.com/wallymagill/mines/internal/uiutil"
 )
@@ -18,18 +20,24 @@ const (
 )
 
 type App struct {
-	view     view
-	launcher launcherModel
-	mines    tea.Model
-	termW    int
-	termH    int
+	view      view
+	launcher  launcherModel
+	mines     tea.Model
+	solitaire solitaireui.Model
+	scores    *store.Store
+	termW     int
+	termH     int
 }
 
 func New(scores *store.Store) App {
+	rng := legacyrand.New(legacyrand.NewSource(time.Now().UnixNano()))
+	solitaire, _ := solitaireui.NewModel(scores, rng)
 	return App{
-		view:     viewLauncher,
-		launcher: newLauncherModel(),
-		mines:    minesui.NewApp(scores),
+		view:      viewLauncher,
+		launcher:  newLauncherModel(),
+		mines:     minesui.NewApp(scores),
+		solitaire: solitaire,
+		scores:    scores,
 	}
 }
 
@@ -45,6 +53,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.mines = model
 			return a, cmd
 		}
+		if a.view == viewSolitaire {
+			model, cmd := a.solitaire.Update(msg)
+			a.solitaire = model
+			return a, cmd
+		}
 		return a, nil
 	case launcherSelectMsg:
 		switch msg.item {
@@ -57,12 +70,23 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 		case launcherSolitaire:
-			a.view = viewSolitaire
+			solitaire, err := solitaireui.NewModel(a.scores, legacyrand.New(legacyrand.NewSource(time.Now().UnixNano())))
+			if err == nil {
+				if a.termW > 0 || a.termH > 0 {
+					model, _ := solitaire.Update(tea.WindowSizeMsg{Width: a.termW, Height: a.termH})
+					solitaire = model
+				}
+				a.solitaire = solitaire
+				a.view = viewSolitaire
+			}
 			return a, nil
 		case launcherQuit:
 			return a, tea.Quit
 		}
 	case minesui.BackMsg:
+		a.view = viewLauncher
+		return a, nil
+	case solitaireui.BackMsg:
 		a.view = viewLauncher
 		return a, nil
 	case tea.KeyMsg:
@@ -87,16 +111,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.mines = model
 		return a, cmd
 	case viewSolitaire:
-		if keyMsg, ok := msg.(tea.KeyMsg); ok && !uiutil.IsRuneBatch(keyMsg) {
-			switch keyMsg.String() {
-			case "m", "esc":
-				a.view = viewLauncher
-				return a, nil
-			case "q":
-				return a, tea.Quit
-			}
-		}
-		return a, nil
+		model, cmd := a.solitaire.Update(msg)
+		a.solitaire = model
+		return a, cmd
 	default:
 		return a, nil
 	}
@@ -109,7 +126,7 @@ func (a App) View() string {
 	case viewMines:
 		return a.mines.View()
 	case viewSolitaire:
-		return "\n" + strings.TrimSpace("SOLITAIRE\n\nDraw 3 coming next.") + "\n"
+		return "\n" + a.solitaire.View() + "\n"
 	default:
 		return ""
 	}
