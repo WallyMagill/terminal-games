@@ -383,8 +383,8 @@ func (m Model) View() string {
 	var b strings.Builder
 	record := m.recordSummary()
 	b.WriteString(styleTitle.Render(fitLine(m.termW,
-		fmt.Sprintf(" SOLITAIRE DRAW 3      ⏱ %03d   moves %03d   %s", m.elapsed, m.game.Moves(), record),
-		fmt.Sprintf(" SOLITAIRE DRAW 3   %03d/%03d %s", m.elapsed, m.game.Moves(), record),
+		fmt.Sprintf(" SOLITAIRE DRAW 3      t %03d   moves %03d   %s", m.elapsed, m.game.Moves(), record),
+		fmt.Sprintf(" SOLITAIRE DRAW 3   t %03d m %03d %s", m.elapsed, m.game.Moves(), record),
 	)))
 	b.WriteString("\n\n")
 	b.WriteString(m.topView())
@@ -462,11 +462,13 @@ func (m Model) topView() string {
 		stock = hiddenToken()
 	}
 	b.WriteString(m.decorate(regionStock, 0, 0, stock))
-	b.WriteString("          ")
+	b.WriteString(" ")
 	waste := m.game.WasteVisible()
-	for range 3 - len(waste) {
-		b.WriteString(emptyToken(" · "))
-		b.WriteString(" ")
+	for i := range 3 - len(waste) {
+		b.WriteString(emptyToken(""))
+		if i < 2 || len(waste) > 0 {
+			b.WriteString(" ")
+		}
 	}
 	for i, card := range waste {
 		token := styledCard(card)
@@ -474,16 +476,20 @@ func (m Model) topView() string {
 			token = m.decorate(regionWaste, 0, 0, token)
 		}
 		b.WriteString(token)
-		b.WriteString(" ")
+		if i < len(waste)-1 {
+			b.WriteString(" ")
+		}
 	}
-	b.WriteString("      ")
+	b.WriteString(" ")
 	for suit := engine.Spades; suit <= engine.Clubs; suit++ {
-		token := emptyToken("·" + suitGlyph(suit) + " ")
+		token := emptyToken("")
 		if card, ok := m.game.FoundationTop(suit); ok {
 			token = styledCard(card)
 		}
 		b.WriteString(m.decorate(regionFoundation, int(suit), 0, token))
-		b.WriteString(" ")
+		if suit < engine.Clubs {
+			b.WriteString(" ")
+		}
 	}
 	return b.String()
 }
@@ -502,7 +508,7 @@ func (m Model) tableauView() string {
 	}
 	for row := range maxRows {
 		for col := range 7 {
-			token := "   "
+			token := "     "
 			if row < len(cols[col]) {
 				card := cols[col][row]
 				if card.FaceUp {
@@ -514,7 +520,6 @@ func (m Model) tableauView() string {
 			}
 			b.WriteString(" ")
 			b.WriteString(token)
-			b.WriteString("  ")
 		}
 		if row < maxRows-1 {
 			b.WriteString("\n")
@@ -525,10 +530,10 @@ func (m Model) tableauView() string {
 
 func (m Model) statusLine() string {
 	if m.game.Status() == engine.Won {
-		full := fmt.Sprintf(" 😎 Solved in %ds · %d moves", m.elapsed, m.game.Moves())
-		compact := fmt.Sprintf(" 😎 %ds · %d moves", m.elapsed, m.game.Moves())
+		full := fmt.Sprintf(" Solved in %ds · %d moves", m.elapsed, m.game.Moves())
+		compact := fmt.Sprintf(" %ds · %d moves", m.elapsed, m.game.Moves())
 		if m.saveErr {
-			compact = fmt.Sprintf(" 😎 %ds · %dm", m.elapsed, m.game.Moves())
+			compact = fmt.Sprintf(" %ds · %dm", m.elapsed, m.game.Moves())
 		}
 		if (m.newBestTime || m.newBestMoves) && !m.saveErr {
 			full += " — NEW BEST!"

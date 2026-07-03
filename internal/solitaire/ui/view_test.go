@@ -22,6 +22,27 @@ func TestViewRendersCoreRegions(t *testing.T) {
 	}
 }
 
+func TestViewUsesBracketedCardTokens(t *testing.T) {
+	m := testModel(t)
+	v := m.View()
+	for _, want := range []string{"[##]", "[  ]"} {
+		if !strings.Contains(v, want) {
+			t.Fatalf("view missing clearer token %q:\n%s", want, v)
+		}
+	}
+	if strings.Contains(v, "░░░") {
+		t.Fatalf("view should not use shaded block card backs after bracket redesign:\n%s", v)
+	}
+}
+
+func TestStatusLineAvoidsEmojiInSolitaireHUD(t *testing.T) {
+	m := testModel(t)
+	v := m.View()
+	if strings.Contains(v, "⏱") || strings.Contains(v, "😎") {
+		t.Fatalf("Solitaire HUD should use stable text instead of emoji:\n%s", v)
+	}
+}
+
 func TestViewShowsUnsetSolitaireRecords(t *testing.T) {
 	m := testModel(t)
 	v := m.View()

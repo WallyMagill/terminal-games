@@ -36,7 +36,7 @@ func cardToken(card engine.Card) string {
 	suit := map[engine.Suit]string{
 		engine.Spades: "♠", engine.Hearts: "♥", engine.Diamonds: "♦", engine.Clubs: "♣",
 	}[card.Suit]
-	return fmt.Sprintf("%-3s", rank+suit)
+	return fmt.Sprintf("[%-3s]", rank+suit)
 }
 
 func styledCard(card engine.Card) string {
@@ -47,5 +47,5 @@ func styledCard(card engine.Card) string {
 	return styleBlack.Render(token)
 }
 
-func hiddenToken() string { return styleFaint.Render("░░░") }
-func emptyToken(s string) string { return styleFaint.Render(s) }
+func hiddenToken() string      { return styleFaint.Render("[##] ") }
+func emptyToken(string) string { return styleFaint.Render("[  ] ") }
