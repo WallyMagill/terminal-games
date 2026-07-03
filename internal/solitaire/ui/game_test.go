@@ -51,6 +51,38 @@ func TestDKeyDrawsAndStartsTimer(t *testing.T) {
 	}
 }
 
+func TestFreshModelIgnoresStaleTickFromPreviousModel(t *testing.T) {
+	old := testModel(t)
+	old, oldTickCmd := old.Update(key("d"))
+	if oldTickCmd == nil {
+		t.Fatal("old model draw should start timer")
+	}
+	staleTick := oldTickCmd()
+
+	fresh := testModel(t)
+	fresh, newTickCmd := fresh.Update(key("d"))
+	if newTickCmd == nil {
+		t.Fatal("fresh model draw should start timer")
+	}
+
+	fresh, cmd := fresh.Update(staleTick)
+	if cmd != nil {
+		t.Fatal("stale tick from old model should not schedule another tick")
+	}
+	if fresh.elapsed != 0 {
+		t.Fatalf("elapsed = %d, want 0 after stale tick", fresh.elapsed)
+	}
+
+	currentTick := newTickCmd()
+	fresh, cmd = fresh.Update(currentTick)
+	if cmd == nil {
+		t.Fatal("current model tick should schedule another tick")
+	}
+	if fresh.elapsed != 1 {
+		t.Fatalf("elapsed = %d, want 1 after current tick", fresh.elapsed)
+	}
+}
+
 func TestEscWithNoSelectionRequestsBack(t *testing.T) {
 	m := testModel(t)
 	_, cmd := m.Update(key("esc"))

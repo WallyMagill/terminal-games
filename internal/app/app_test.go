@@ -1,6 +1,7 @@
 package app
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -104,6 +105,46 @@ func TestSolitaireEscReturnsToLauncher(t *testing.T) {
 	if a.view != viewLauncher {
 		t.Fatalf("view = %v, want viewLauncher", a.view)
 	}
+}
+
+func TestReenteredSolitaireIgnoresStaleTickFromPreviousSession(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(launcherSelectMsg{item: launcherSolitaire})
+	a = model.(App)
+	model, oldTickCmd := a.Update(key("d"))
+	a = model.(App)
+	if oldTickCmd == nil {
+		t.Fatal("first Solitaire session draw should start timer")
+	}
+	staleTick := oldTickCmd()
+
+	model, _ = a.Update(solitaireui.BackMsg{})
+	a = model.(App)
+	model, _ = a.Update(launcherSelectMsg{item: launcherSolitaire})
+	a = model.(App)
+	model, newTickCmd := a.Update(key("d"))
+	a = model.(App)
+	if newTickCmd == nil {
+		t.Fatal("second Solitaire session draw should start timer")
+	}
+
+	model, cmd := a.Update(staleTick)
+	a = model.(App)
+	if cmd != nil {
+		t.Fatal("stale tick from previous Solitaire session should not schedule another tick")
+	}
+	if elapsed := solitaireIntField(t, a, "elapsed"); elapsed != 0 {
+		t.Fatalf("elapsed = %d, want 0 after stale tick", elapsed)
+	}
+}
+
+func solitaireIntField(t *testing.T, a App, name string) int {
+	t.Helper()
+	field := reflect.ValueOf(a.solitaire).FieldByName(name)
+	if !field.IsValid() {
+		t.Fatalf("Solitaire field %q not found", name)
+	}
+	return int(field.Int())
 }
 
 func TestLauncherQuit(t *testing.T) {

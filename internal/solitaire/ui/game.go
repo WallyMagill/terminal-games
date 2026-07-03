@@ -4,6 +4,7 @@ import (
 	"fmt"
 	legacyrand "math/rand"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,10 +15,15 @@ import (
 
 type BackMsg struct{}
 
-type tickMsg struct{ gen int }
+type tickMsg struct {
+	session uint64
+	gen     int
+}
 
-func tickCmd(gen int) tea.Cmd {
-	return tea.Tick(time.Second, func(time.Time) tea.Msg { return tickMsg{gen: gen} })
+var nextTickSession atomic.Uint64
+
+func tickCmd(session uint64, gen int) tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg { return tickMsg{session: session, gen: gen} })
 }
 
 type Model struct {
@@ -29,6 +35,7 @@ type Model struct {
 	elapsed      int
 	running      bool
 	tickGen      int
+	tickSession  uint64
 	termW        int
 	message      string
 	showHelp     bool
@@ -43,7 +50,7 @@ func NewModel(scores *store.Store, rng *legacyrand.Rand) (Model, error) {
 	if err != nil {
 		return Model{}, err
 	}
-	return Model{game: game, scores: scores, rng: rng}, nil
+	return Model{game: game, scores: scores, rng: rng, tickSession: nextTickSession.Add(1)}, nil
 }
 
 func back() tea.Cmd { return func() tea.Msg { return BackMsg{} } }
@@ -51,14 +58,14 @@ func back() tea.Cmd { return func() tea.Msg { return BackMsg{} } }
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
-		if msg.gen != m.tickGen {
+		if msg.session != m.tickSession || msg.gen != m.tickGen {
 			return m, nil
 		}
 		if m.running && m.game.Status() == engine.Playing {
 			if m.elapsed < 999 {
 				m.elapsed++
 			}
-			return m, tickCmd(m.tickGen)
+			return m, tickCmd(m.tickSession, m.tickGen)
 		}
 		m.running = false
 		return m, nil
@@ -172,7 +179,7 @@ func (m Model) startTimerIfNeeded(changed bool) (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.running = true
-	return m, tickCmd(m.tickGen)
+	return m, tickCmd(m.tickSession, m.tickGen)
 }
 
 func (m *Model) recordWinIfNeeded() {
