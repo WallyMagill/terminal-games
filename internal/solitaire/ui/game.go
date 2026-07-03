@@ -74,6 +74,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.termW, m.termH = msg.Width, msg.Height
 		return m, nil
 	case tea.KeyMsg:
+		if m.tooSmall() && !uiutil.IsRuneBatch(msg) {
+			switch msg.String() {
+			case "m", "esc":
+				m.showHelp = false
+				m.selected = nil
+				return m, back()
+			case "q":
+				return m, tea.Quit
+			}
+		}
 		if m.showHelp {
 			m.showHelp = false
 			return m, nil
@@ -149,6 +159,9 @@ func (m Model) draw() (Model, tea.Cmd) {
 func (m Model) activate() (Model, tea.Cmd) {
 	loc := m.cursor.location()
 	if m.selected == nil {
+		if loc.Kind == engine.Stock {
+			return m.draw()
+		}
 		m.selected = &loc
 		m.message = "Selected"
 		return m, nil
@@ -165,7 +178,11 @@ func (m Model) activate() (Model, tea.Cmd) {
 }
 
 func (m Model) autoFoundation() (Model, tea.Cmd) {
-	changed := m.game.AutoFoundation(m.cursor.location())
+	loc := m.cursor.location()
+	if m.selected != nil {
+		loc = *m.selected
+	}
+	changed := m.game.AutoFoundation(loc)
 	m.selected = nil
 	if changed {
 		m.message = "Moved to foundation"

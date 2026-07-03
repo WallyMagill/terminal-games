@@ -88,6 +88,7 @@ func TestStatusLineUsesCompactHintAtMinimumWidth(t *testing.T) {
 
 func TestSelectedStatusLineTakesPriorityOverMessage(t *testing.T) {
 	m := testModel(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
 	m, _ = m.Update(key(" "))
 	v := m.View()
 	if !strings.Contains(v, "selected · choose destination") {

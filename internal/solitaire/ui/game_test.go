@@ -51,6 +51,35 @@ func TestDKeyDrawsAndStartsTimer(t *testing.T) {
 	}
 }
 
+func TestActivateOnStockDrawsAndStartsTimer(t *testing.T) {
+	m := testModel(t)
+	m, cmd := m.Update(key(" "))
+	if m.game.StockCount() != 21 {
+		t.Fatalf("stock = %d, want 21", m.game.StockCount())
+	}
+	if m.selected != nil {
+		t.Fatal("stock activation should draw, not select stock")
+	}
+	if !m.running || cmd == nil {
+		t.Fatal("stock activation should start timer and return tick command")
+	}
+}
+
+func TestActivateOnEmptyStockRecyclesWaste(t *testing.T) {
+	m := testModel(t)
+	for range 8 {
+		m, _ = m.Update(key("d"))
+	}
+	if m.game.StockCount() != 0 {
+		t.Fatalf("stock after drawing deck = %d, want 0", m.game.StockCount())
+	}
+	m.cursor = cursor{region: regionStock}
+	m, _ = m.Update(key("enter"))
+	if m.game.StockCount() != 24 {
+		t.Fatalf("stock after activate recycle = %d, want 24", m.game.StockCount())
+	}
+}
+
 func TestFreshModelIgnoresStaleTickFromPreviousModel(t *testing.T) {
 	old := testModel(t)
 	old, oldTickCmd := old.Update(key("d"))
@@ -110,6 +139,22 @@ func TestHelpDismissesWithoutMoving(t *testing.T) {
 	}
 }
 
+func TestTooSmallGuardMenuBypassesHiddenHelp(t *testing.T) {
+	m := testModel(t)
+	m, _ = m.Update(key("?"))
+	if !m.showHelp {
+		t.Fatal("? should open help")
+	}
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 24, Height: 8})
+	_, cmd := m.Update(key("m"))
+	if cmd == nil {
+		t.Fatal("m on too-small guard should request launcher back even when help was open")
+	}
+	if _, ok := cmd().(BackMsg); !ok {
+		t.Fatal("m on too-small guard should produce BackMsg")
+	}
+}
+
 func TestCursorMovesAcrossRegions(t *testing.T) {
 	m := testModel(t)
 	m, _ = m.Update(key("right"))
@@ -128,6 +173,7 @@ func TestCursorMovesAcrossRegions(t *testing.T) {
 
 func TestSelectionEscCancelsWithoutBack(t *testing.T) {
 	m := testModel(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
 	m, _ = m.Update(key("enter"))
 	if m.selected == nil {
 		t.Fatal("enter should select current location")
@@ -173,6 +219,25 @@ func TestAutoFoundationMovesCursorCard(t *testing.T) {
 	top, ok := m.game.FoundationTop(ace.Suit)
 	if !ok || top != ace {
 		t.Fatalf("foundation top = %+v/%v, want moved ace %+v", top, ok, ace)
+	}
+}
+
+func TestAutoFoundationMovesSelectedCard(t *testing.T) {
+	m := modelWithTopTableauAce(t)
+	col, row := topTableauAce(t, m.game)
+	ace := m.game.Tableau(col)[row].Card
+	m.selected = &engine.Location{Kind: engine.Tableau, Pile: col, Index: row}
+	m.cursor = cursor{region: regionStock}
+	m, cmd := m.Update(key("a"))
+	if cmd == nil || !m.running {
+		t.Fatal("successful selected auto-foundation should start timer")
+	}
+	if m.selected != nil {
+		t.Fatal("auto-foundation should clear selection")
+	}
+	top, ok := m.game.FoundationTop(ace.Suit)
+	if !ok || top != ace {
+		t.Fatalf("foundation top = %+v/%v, want selected ace %+v", top, ok, ace)
 	}
 }
 
