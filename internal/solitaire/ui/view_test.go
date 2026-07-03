@@ -94,6 +94,25 @@ func TestWonCompactStatusKeepsNavigationHints(t *testing.T) {
 	}
 }
 
+func TestWonCompactSaveErrorStatusFitsMinimumWidth(t *testing.T) {
+	m := testModel(t)
+	m.game = oneMoveFromWin(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	m.elapsed = 999
+	m.termW = solitaireMinCols
+	m, _ = m.Update(key("a"))
+	m.saveErr = true
+	status := m.statusLine()
+	for _, want := range []string{"save failed", "n new", "m menu"} {
+		if !strings.Contains(status, want) {
+			t.Fatalf("save-error status missing %q in %q", want, status)
+		}
+	}
+	if w := lipgloss.Width(status); w > solitaireMinCols {
+		t.Fatalf("save-error status is %d cols, max %d: %q", w, solitaireMinCols, status)
+	}
+}
+
 func TestViewDecoratesFocusedStock(t *testing.T) {
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	m := testModel(t)

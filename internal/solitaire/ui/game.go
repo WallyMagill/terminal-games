@@ -414,9 +414,14 @@ func (m Model) statusLine() string {
 	if m.game.Status() == engine.Won {
 		full := fmt.Sprintf(" 😎 Solved in %ds · %d moves", m.elapsed, m.game.Moves())
 		compact := fmt.Sprintf(" 😎 %ds · %d moves", m.elapsed, m.game.Moves())
+		if m.saveErr {
+			compact = fmt.Sprintf(" 😎 %ds · %dm", m.elapsed, m.game.Moves())
+		}
 		if m.newBestTime || m.newBestMoves {
 			full += " — NEW BEST!"
-			compact += " — BEST!"
+			if !m.saveErr {
+				compact += " — BEST!"
+			}
 		}
 		if m.saveErr {
 			full += styleErr.Render(" (save failed)")
