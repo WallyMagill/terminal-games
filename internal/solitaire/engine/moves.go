@@ -33,6 +33,17 @@ func (g *Game) LegalMoves() []Move {
 	return moves
 }
 
+func (g *Game) SafeFoundationMoves() []Move {
+	moves := g.LegalMoves()
+	safe := moves[:0]
+	for _, move := range moves {
+		if move.Destination.Kind == Foundation && move.Safe {
+			safe = append(safe, move)
+		}
+	}
+	return safe
+}
+
 func (g *Game) LegalMovesFrom(src Location) []Move {
 	if g.status == Won {
 		return nil
@@ -132,6 +143,7 @@ func (g *Game) cardMovesFrom(src Location) []Move {
 					Destination: dst,
 					Cards:       cloneCards(cards),
 					RevealsCard: g.revealsCard(src),
+					Safe:        g.safeFoundationMove(cards[0]),
 				})
 			}
 		}
@@ -167,6 +179,35 @@ func moveKind(src, dst PileKind) MoveKind {
 	default:
 		return MoveDraw
 	}
+}
+
+func (g *Game) safeFoundationMove(card Card) bool {
+	if card.Rank <= Two {
+		return true
+	}
+
+	required := card.Rank - 1
+	for _, suit := range oppositeColorSuits(card.Suit) {
+		if g.foundationRank(suit) < required {
+			return false
+		}
+	}
+	return true
+}
+
+func (g *Game) foundationRank(suit Suit) Rank {
+	top, ok := g.FoundationTop(suit)
+	if !ok {
+		return 0
+	}
+	return top.Rank
+}
+
+func oppositeColorSuits(suit Suit) [2]Suit {
+	if suit.Red() {
+		return [2]Suit{Spades, Clubs}
+	}
+	return [2]Suit{Hearts, Diamonds}
 }
 
 func (g *Game) revealsCard(src Location) bool {

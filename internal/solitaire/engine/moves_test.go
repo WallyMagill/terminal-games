@@ -106,6 +106,58 @@ func TestApplyMoveDelegatesDrawAndCardMoves(t *testing.T) {
 	}
 }
 
+func TestSafeFoundationMovesIncludeAcesAndTwos(t *testing.T) {
+	g := &Game{status: Playing}
+	g.tableau[0] = []TableauCard{{Card: Card{Rank: Ace, Suit: Hearts}, FaceUp: true}}
+	g.tableau[1] = []TableauCard{{Card: Card{Rank: Two, Suit: Spades}, FaceUp: true}}
+	g.foundations[Spades] = []Card{{Rank: Ace, Suit: Spades}}
+
+	moves := g.SafeFoundationMoves()
+	if !hasMove(moves, MoveTableauToFoundation, Location{Kind: Tableau, Pile: 0, Index: 0}, Location{Kind: Foundation, Pile: int(Hearts)}) {
+		t.Fatalf("ace should be safe to foundation: %+v", moves)
+	}
+	if !hasMove(moves, MoveTableauToFoundation, Location{Kind: Tableau, Pile: 1, Index: 0}, Location{Kind: Foundation, Pile: int(Spades)}) {
+		t.Fatalf("two should be safe when its ace is founded: %+v", moves)
+	}
+}
+
+func TestSafeFoundationMovesHoldCardsNeededByOppositeColors(t *testing.T) {
+	g := &Game{status: Playing}
+	g.foundations[Hearts] = []Card{
+		{Rank: Ace, Suit: Hearts},
+		{Rank: Two, Suit: Hearts},
+		{Rank: Three, Suit: Hearts},
+		{Rank: Four, Suit: Hearts},
+	}
+	g.tableau[0] = []TableauCard{{Card: Card{Rank: Five, Suit: Hearts}, FaceUp: true}}
+	g.foundations[Spades] = []Card{{Rank: Ace, Suit: Spades}}
+	g.foundations[Clubs] = []Card{{Rank: Ace, Suit: Clubs}}
+
+	moves := g.SafeFoundationMoves()
+	if hasMove(moves, MoveTableauToFoundation, Location{Kind: Tableau, Pile: 0, Index: 0}, Location{Kind: Foundation, Pile: int(Hearts)}) {
+		t.Fatalf("5♥ should not be safe while black foundations are below 4: %+v", moves)
+	}
+}
+
+func TestLegalMovesClassifySafeFoundationMoves(t *testing.T) {
+	g := &Game{status: Playing}
+	g.tableau[0] = []TableauCard{{Card: Card{Rank: Three, Suit: Hearts}, FaceUp: true}}
+	g.foundations[Hearts] = []Card{{Rank: Ace, Suit: Hearts}, {Rank: Two, Suit: Hearts}}
+	g.foundations[Spades] = []Card{{Rank: Ace, Suit: Spades}, {Rank: Two, Suit: Spades}}
+	g.foundations[Clubs] = []Card{{Rank: Ace, Suit: Clubs}, {Rank: Two, Suit: Clubs}}
+
+	moves := g.LegalMoves()
+	if !hasSafeMove(moves, MoveTableauToFoundation, Location{Kind: Tableau, Pile: 0, Index: 0}, Location{Kind: Foundation, Pile: int(Hearts)}) {
+		t.Fatalf("3♥ should be marked safe when both black foundations reached 2: %+v", moves)
+	}
+
+	g.foundations[Clubs] = []Card{{Rank: Ace, Suit: Clubs}}
+	moves = g.LegalMoves()
+	if hasSafeMove(moves, MoveTableauToFoundation, Location{Kind: Tableau, Pile: 0, Index: 0}, Location{Kind: Foundation, Pile: int(Hearts)}) {
+		t.Fatalf("3♥ should not be marked safe while one black foundation is below 2: %+v", moves)
+	}
+}
+
 func hasMoveKind(moves []Move, kind MoveKind) bool {
 	for _, move := range moves {
 		if move.Kind == kind {
@@ -118,6 +170,15 @@ func hasMoveKind(moves []Move, kind MoveKind) bool {
 func hasMove(moves []Move, kind MoveKind, src Location, dst Location) bool {
 	for _, move := range moves {
 		if move.Kind == kind && sameLocationForTest(move.Source, src) && sameLocationForTest(move.Destination, dst) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSafeMove(moves []Move, kind MoveKind, src Location, dst Location) bool {
+	for _, move := range moves {
+		if move.Kind == kind && move.Safe && sameLocationForTest(move.Source, src) && sameLocationForTest(move.Destination, dst) {
 			return true
 		}
 	}
