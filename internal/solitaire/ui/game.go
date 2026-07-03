@@ -228,7 +228,7 @@ func (m Model) activate() (Model, tea.Cmd) {
 		default:
 			m.selected = &loc
 			m.selectedMoves = append([]engine.Move(nil), moves...)
-			m = m.focusLocation(m.selectedMoves[0].Destination)
+			m = m.focusDestination(m.selectedMoves[0].Destination)
 			m.message = "Selected"
 			return m, nil
 		}

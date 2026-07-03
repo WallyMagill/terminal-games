@@ -278,6 +278,34 @@ func TestSpaceKeepsSelectionWhenMultipleDestinationsExist(t *testing.T) {
 	}
 }
 
+func TestDestinationCandidatesFocusNonEmptyTableauTopRows(t *testing.T) {
+	m := modelWithMovableFourAndNonEmptyTableauDestinations(t)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+
+	m, _ = m.Update(key(" "))
+	if m.selected == nil {
+		t.Fatal("source with multiple destinations should stay selected")
+	}
+	if len(m.selectedMoves) < 2 {
+		t.Fatalf("expected multiple destination candidates, got %+v", m.selectedMoves)
+	}
+
+	firstPile := m.selectedMoves[0].Destination.Pile
+	firstCards := m.game.Tableau(firstPile)
+	firstCursor := cursor{region: regionTableau, col: firstPile, row: len(firstCards) - 1}
+	if m.cursor != firstCursor {
+		t.Errorf("initial destination focus = %+v, want top row %+v", m.cursor, firstCursor)
+	}
+
+	m, _ = m.Update(key("tab"))
+	secondPile := m.selectedMoves[1].Destination.Pile
+	secondCards := m.game.Tableau(secondPile)
+	secondCursor := cursor{region: regionTableau, col: secondPile, row: len(secondCards) - 1}
+	if m.cursor != secondCursor {
+		t.Errorf("cycled destination focus = %+v, want top row %+v", m.cursor, secondCursor)
+	}
+}
+
 func TestTabCyclesSelectedDestinationCandidates(t *testing.T) {
 	m := modelWithMovableKingAndTwoEmptyColumns(t)
 	m.cursor = cursor{region: regionTableau, col: 0, row: 0}

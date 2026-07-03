@@ -32,6 +32,19 @@ func (m Model) focusLocation(loc engine.Location) Model {
 	return m
 }
 
+func (m Model) focusDestination(loc engine.Location) Model {
+	if loc.Kind != engine.Tableau {
+		return m.focusLocation(loc)
+	}
+	cards := m.game.Tableau(loc.Pile)
+	row := 0
+	if len(cards) > 0 {
+		row = len(cards) - 1
+	}
+	m.cursor = cursor{region: regionTableau, col: loc.Pile, row: row}
+	return m
+}
+
 func (m Model) cyclePlayableSource(direction int) Model {
 	sources := m.playableSources()
 	if len(sources) == 0 {
@@ -69,12 +82,12 @@ func (m Model) cycleSelectedDestination(direction int) Model {
 	}
 	if index == -1 {
 		if direction < 0 {
-			return m.focusLocation(m.selectedMoves[len(m.selectedMoves)-1].Destination)
+			return m.focusDestination(m.selectedMoves[len(m.selectedMoves)-1].Destination)
 		}
-		return m.focusLocation(m.selectedMoves[0].Destination)
+		return m.focusDestination(m.selectedMoves[0].Destination)
 	}
 	next := (index + direction + len(m.selectedMoves)) % len(m.selectedMoves)
-	return m.focusLocation(m.selectedMoves[next].Destination)
+	return m.focusDestination(m.selectedMoves[next].Destination)
 }
 
 func (m Model) selectedMoveTo(dst engine.Location) (engine.Move, bool) {
