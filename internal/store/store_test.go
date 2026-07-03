@@ -216,6 +216,39 @@ func TestRecordSolitaireDraw3KeepsIndependentBests(t *testing.T) {
 	}
 }
 
+func TestSolitaireAssistedRecordsAreSeparateFromNormalRecords(t *testing.T) {
+	s := store.New(t.TempDir() + "/scores.json")
+
+	normalTime, normalMoves, err := s.RecordSolitaireDraw3Mode(store.SolitaireNormal, 120, 80)
+	if err != nil || !normalTime || !normalMoves {
+		t.Fatalf("normal record write = %v %v %v, want new records", normalTime, normalMoves, err)
+	}
+	assistTime, assistMoves, err := s.RecordSolitaireDraw3Mode(store.SolitaireAssisted, 90, 40)
+	if err != nil || !assistTime || !assistMoves {
+		t.Fatalf("assisted record write = %v %v %v, want new records", assistTime, assistMoves, err)
+	}
+
+	normal := s.LoadSolitaireDraw3(store.SolitaireNormal)
+	assisted := s.LoadSolitaireDraw3(store.SolitaireAssisted)
+	if normal.BestSeconds == nil || *normal.BestSeconds != 120 || normal.FewestMoves == nil || *normal.FewestMoves != 80 {
+		t.Fatalf("normal record = %+v, want 120s/80m", normal)
+	}
+	if assisted.BestSeconds == nil || *assisted.BestSeconds != 90 || assisted.FewestMoves == nil || *assisted.FewestMoves != 40 {
+		t.Fatalf("assisted record = %+v, want 90s/40m", assisted)
+	}
+}
+
+func TestLegacySolitaireRecordWrapperWritesNormalRecord(t *testing.T) {
+	s := store.New(t.TempDir() + "/scores.json")
+	_, _, err := s.RecordSolitaireDraw3(200, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assisted := s.LoadSolitaireDraw3(store.SolitaireAssisted); assisted.BestSeconds != nil || assisted.FewestMoves != nil {
+		t.Fatalf("legacy wrapper should not write assisted record: %+v", assisted)
+	}
+}
+
 // Saves use a unique temp name per call, so "no temp left behind" is
 // pinned by listing the directory rather than statting one fixed path.
 func TestSaveLeavesNoTempFile(t *testing.T) {

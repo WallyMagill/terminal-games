@@ -14,7 +14,18 @@ import (
 type Scores map[string]int
 
 const recordsVersion = 2
-const solitaireDraw3Key = "draw3"
+
+const (
+	solitaireDraw3Key         = "draw3"
+	solitaireDraw3AssistedKey = "draw3-assisted"
+)
+
+type SolitaireRecordMode int
+
+const (
+	SolitaireNormal SolitaireRecordMode = iota
+	SolitaireAssisted
+)
 
 type Records struct {
 	Version   int                        `json:"version"`
@@ -227,9 +238,25 @@ func (s *Store) RecordMinesBest(key string, secs int) (bool, error) {
 	return true, s.SaveRecords(records)
 }
 
+func (mode SolitaireRecordMode) draw3Key() string {
+	if mode == SolitaireAssisted {
+		return solitaireDraw3AssistedKey
+	}
+	return solitaireDraw3Key
+}
+
+func (s *Store) LoadSolitaireDraw3(mode SolitaireRecordMode) SolitaireRecord {
+	return s.LoadRecords().Solitaire[mode.draw3Key()]
+}
+
 func (s *Store) RecordSolitaireDraw3(secs, moves int) (bool, bool, error) {
+	return s.RecordSolitaireDraw3Mode(SolitaireNormal, secs, moves)
+}
+
+func (s *Store) RecordSolitaireDraw3Mode(mode SolitaireRecordMode, secs, moves int) (bool, bool, error) {
 	records := s.LoadRecords()
-	rec := records.Solitaire[solitaireDraw3Key]
+	key := mode.draw3Key()
+	rec := records.Solitaire[key]
 	newBestTime := rec.BestSeconds == nil || secs < *rec.BestSeconds
 	newFewestMoves := rec.FewestMoves == nil || moves < *rec.FewestMoves
 	if !newBestTime && !newFewestMoves {
@@ -243,7 +270,7 @@ func (s *Store) RecordSolitaireDraw3(secs, moves int) (bool, bool, error) {
 		fewest := moves
 		rec.FewestMoves = &fewest
 	}
-	records.Solitaire[solitaireDraw3Key] = rec
+	records.Solitaire[key] = rec
 	err := s.SaveRecords(records)
 	return newBestTime, newFewestMoves, err
 }
