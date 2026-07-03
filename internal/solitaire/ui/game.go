@@ -144,6 +144,8 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		return m.activate()
 	case "a":
 		return m.autoFoundation()
+	case "A":
+		return m.autoFoundationAll()
 	case "u":
 		return m.undo()
 	case "tab":
@@ -281,17 +283,55 @@ func (m Model) autoFoundation() (Model, tea.Cmd) {
 	if m.selected != nil {
 		loc = *m.selected
 	}
+	move, ok := m.safeFoundationMoveFrom(loc)
+	if !ok {
+		m.message = "No safe foundation move"
+		return m, nil
+	}
 	before := m.game.Clone()
-	changed := m.game.AutoFoundation(loc)
-	m = m.clearSelection()
+	changed := m.game.ApplyMove(move)
 	if changed {
 		m.undoStack = append(m.undoStack, before)
+		m = m.clearSelection()
 		m.message = "Moved to foundation"
 	} else {
-		m.message = "No foundation move"
+		m.message = "No safe foundation move"
 	}
 	m.recordWinIfNeeded()
 	return m.startTimerIfNeeded(changed)
+}
+
+func (m Model) safeFoundationMoveFrom(loc engine.Location) (engine.Move, bool) {
+	for _, move := range m.game.SafeFoundationMoves() {
+		if move.Source == loc {
+			return move, true
+		}
+	}
+	return engine.Move{}, false
+}
+
+func (m Model) autoFoundationAll() (Model, tea.Cmd) {
+	before := m.game.Clone()
+	moved := 0
+	for moved < 52 {
+		moves := m.game.SafeFoundationMoves()
+		if len(moves) == 0 {
+			break
+		}
+		if !m.game.ApplyMove(moves[0]) {
+			break
+		}
+		moved++
+	}
+	if moved == 0 {
+		m.message = "No safe foundation moves"
+		return m, nil
+	}
+	m.undoStack = append(m.undoStack, before)
+	m = m.clearSelection()
+	m.message = "Moved safe cards to foundation"
+	m.recordWinIfNeeded()
+	return m.startTimerIfNeeded(true)
 }
 
 func (m Model) undo() (Model, tea.Cmd) {
@@ -648,7 +688,7 @@ func (m Model) statusLine() string {
 		return styleErr.Render(" " + clampLine(m.message, m.termW-1))
 	}
 	return fitLine(m.termW,
-		styleFaint.Render(" spc select/move · d draw · a foundation · n new · m menu · ? help"),
+		styleFaint.Render(" spc select/move · d draw · a foundation · A all · n new · m menu · ? help"),
 		styleFaint.Render(" spc select · d draw · ? help"),
 	)
 }
@@ -660,7 +700,8 @@ func (m Model) helpView() string {
 		" hjkl/arrows  move",
 		" spc/enter    select card or move selection",
 		" d            draw 3 / recycle stock",
-		" a            move focused/selected card to foundation",
+		" a            move focused/selected safe card to foundation",
+		" A            auto-foundation all safe cards",
 		" esc          cancel selection / menu",
 		" n            new deal",
 		" m            menu",

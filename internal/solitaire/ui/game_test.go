@@ -415,6 +415,57 @@ func TestAutoFoundationMovesSelectedCard(t *testing.T) {
 	}
 }
 
+func TestSafeAutoFoundationMovesAllSafeCardsWithoutAssistedFlag(t *testing.T) {
+	m := modelWithSafeFoundationCards(t)
+	m, _ = m.Update(key("A"))
+	top, ok := m.game.FoundationTop(engine.Spades)
+	if !ok || top.Rank != engine.Two {
+		t.Fatalf("A should move all currently safe spade cards to foundation, got %+v/%v", top, ok)
+	}
+	if m.assisted {
+		t.Fatal("safe auto-foundation should not mark game assisted")
+	}
+}
+
+func TestSafeAutoFoundationDoesNotMoveUnsafeHigherCard(t *testing.T) {
+	m := modelWithUnsafeHeartFive(t)
+	m, _ = m.Update(key("A"))
+	if top, ok := m.game.FoundationTop(engine.Hearts); ok && top.Rank == engine.Five {
+		t.Fatal("A should not move unsafe 5♥ to foundation")
+	}
+}
+
+func TestSafeAutoFoundationUndoRestoresWholeBatch(t *testing.T) {
+	m := modelWithSafeFoundationCards(t)
+	m, _ = m.Update(key("A"))
+	if top, ok := m.game.FoundationTop(engine.Spades); !ok || top.Rank != engine.Two {
+		t.Fatalf("A should move through 2♠ before undo, got %+v/%v", top, ok)
+	}
+	m, _ = m.Update(key("u"))
+	if _, ok := m.game.FoundationTop(engine.Spades); ok {
+		t.Fatal("one undo should restore the whole safe auto-foundation batch")
+	}
+	if m.game.Moves() != 0 {
+		t.Fatalf("undo should restore move count to 0, got %d", m.game.Moves())
+	}
+}
+
+func TestAutoFoundationKeepsSelectionWhenSelectedCardIsUnsafe(t *testing.T) {
+	m := modelWithUnsafeHeartFive(t)
+	m.selected = &engine.Location{Kind: engine.Tableau, Pile: 0, Index: 0}
+	m.cursor = cursor{region: regionStock}
+	m, cmd := m.Update(key("a"))
+	if cmd != nil {
+		t.Fatal("failed safe auto-foundation should not start timer")
+	}
+	if m.selected == nil {
+		t.Fatal("failed safe auto-foundation should keep selection")
+	}
+	if top, ok := m.game.FoundationTop(engine.Hearts); ok && top.Rank == engine.Five {
+		t.Fatal("a should not move unsafe 5♥ to foundation")
+	}
+}
+
 func TestNewDealResetsBoardAndTimer(t *testing.T) {
 	m := testModel(t)
 	m, _ = m.Update(key("d"))
@@ -598,6 +649,44 @@ func modelWithMovableFourAndNonEmptyTableauDestinations(t *testing.T) Model {
 			{Card: engine.Card{Rank: engine.Five, Suit: engine.Diamonds}, FaceUp: true},
 		},
 	})
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
+	m.game = g
+	return m
+}
+
+func modelWithSafeFoundationCards(t *testing.T) Model {
+	t.Helper()
+	m := testModel(t)
+	g := &engine.Game{}
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("status"), engine.Playing)
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("tableau"), [7][]engine.TableauCard{
+		{{Card: engine.Card{Rank: engine.Ace, Suit: engine.Spades}, FaceUp: true}},
+		{{Card: engine.Card{Rank: engine.Two, Suit: engine.Spades}, FaceUp: true}},
+	})
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
+	m.game = g
+	return m
+}
+
+func modelWithUnsafeHeartFive(t *testing.T) Model {
+	t.Helper()
+	m := testModel(t)
+	g := &engine.Game{}
+	foundations := [4][]engine.Card{
+		engine.Hearts: {
+			{Rank: engine.Ace, Suit: engine.Hearts},
+			{Rank: engine.Two, Suit: engine.Hearts},
+			{Rank: engine.Three, Suit: engine.Hearts},
+			{Rank: engine.Four, Suit: engine.Hearts},
+		},
+	}
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("status"), engine.Playing)
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("tableau"), [7][]engine.TableauCard{
+		{{Card: engine.Card{Rank: engine.Five, Suit: engine.Hearts}, FaceUp: true}},
+	})
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("foundations"), foundations)
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
 	m.game = g
