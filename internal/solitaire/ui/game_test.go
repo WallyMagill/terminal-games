@@ -40,6 +40,15 @@ func testModel(t *testing.T) Model {
 	return m
 }
 
+func testModelWithStore(t *testing.T, scores *store.Store) Model {
+	t.Helper()
+	m, err := NewModel(scores, legacyrand.New(legacyrand.NewSource(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
 func TestDKeyDrawsAndStartsTimer(t *testing.T) {
 	m := testModel(t)
 	m, cmd := m.Update(key("d"))
@@ -201,6 +210,40 @@ func TestSelectionEscCancelsWithoutBack(t *testing.T) {
 	}
 	if m.selected != nil {
 		t.Fatal("esc should clear selection")
+	}
+}
+
+func TestActivateIgnoresEmptyWasteSelection(t *testing.T) {
+	m := testModel(t)
+	m.cursor = cursor{region: regionWaste}
+	m, cmd := m.Update(key(" "))
+	if cmd != nil {
+		t.Fatal("empty waste selection should not return command")
+	}
+	if m.selected != nil {
+		t.Fatalf("empty waste should not become selected: %+v", *m.selected)
+	}
+	_, cmd = m.Update(key("esc"))
+	if cmd == nil {
+		t.Fatal("esc after ignored empty selection should return to launcher")
+	}
+}
+
+func TestActivateIgnoresEmptyFoundationSelection(t *testing.T) {
+	m := testModel(t)
+	m.cursor = cursor{region: regionFoundation, col: int(engine.Spades)}
+	m, _ = m.Update(key(" "))
+	if m.selected != nil {
+		t.Fatalf("empty foundation should not become selected: %+v", *m.selected)
+	}
+}
+
+func TestActivateIgnoresFaceDownTableauSelection(t *testing.T) {
+	m := testModel(t)
+	m.cursor = cursor{region: regionTableau, col: 6, row: 0}
+	m, _ = m.Update(key(" "))
+	if m.selected != nil {
+		t.Fatalf("face-down tableau card should not become selected: %+v", *m.selected)
 	}
 }
 

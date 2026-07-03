@@ -44,6 +44,8 @@ type Model struct {
 	newBestMoves bool
 	saveErr      bool
 	recordedWin  bool
+	bestSeconds  *int
+	fewestMoves  *int
 }
 
 func NewModel(scores *store.Store, rng *legacyrand.Rand) (Model, error) {
@@ -51,7 +53,31 @@ func NewModel(scores *store.Store, rng *legacyrand.Rand) (Model, error) {
 	if err != nil {
 		return Model{}, err
 	}
-	return Model{game: game, scores: scores, rng: rng, tickSession: nextTickSession.Add(1)}, nil
+	bestSeconds, fewestMoves := loadDraw3Record(scores)
+	return Model{
+		game:        game,
+		scores:      scores,
+		rng:         rng,
+		tickSession: nextTickSession.Add(1),
+		bestSeconds: bestSeconds,
+		fewestMoves: fewestMoves,
+	}, nil
+}
+
+func loadDraw3Record(scores *store.Store) (*int, *int) {
+	if scores == nil {
+		return nil, nil
+	}
+	rec := scores.LoadRecords().Solitaire["draw3"]
+	var bestSeconds *int
+	if rec.BestSeconds != nil {
+		bestSeconds = new(*rec.BestSeconds)
+	}
+	var fewestMoves *int
+	if rec.FewestMoves != nil {
+		fewestMoves = new(*rec.FewestMoves)
+	}
+	return bestSeconds, fewestMoves
 }
 
 func back() tea.Cmd { return func() tea.Msg { return BackMsg{} } }
@@ -165,6 +191,10 @@ func (m Model) activate() (Model, tea.Cmd) {
 		if loc.Kind == engine.Stock {
 			return m.draw()
 		}
+		if !m.selectable(loc) {
+			m.message = "No card selected"
+			return m, nil
+		}
 		m.selected = &loc
 		m.message = "Selected"
 		return m, nil
@@ -178,6 +208,21 @@ func (m Model) activate() (Model, tea.Cmd) {
 	}
 	m.recordWinIfNeeded()
 	return m.startTimerIfNeeded(changed)
+}
+
+func (m Model) selectable(loc engine.Location) bool {
+	switch loc.Kind {
+	case engine.Waste:
+		return len(m.game.WasteVisible()) > 0
+	case engine.Foundation:
+		_, ok := m.game.FoundationTop(engine.Suit(loc.Pile))
+		return ok
+	case engine.Tableau:
+		cards := m.game.Tableau(loc.Pile)
+		return loc.Index >= 0 && loc.Index < len(cards) && cards[loc.Index].FaceUp
+	default:
+		return false
+	}
 }
 
 func (m Model) autoFoundation() (Model, tea.Cmd) {
@@ -216,6 +261,32 @@ func (m *Model) recordWinIfNeeded() {
 	m.newBestTime = newBestTime
 	m.newBestMoves = newBestMoves
 	m.saveErr = err != nil
+	if err == nil {
+		if newBestTime {
+			m.bestSeconds = new(m.elapsed)
+		}
+		if newBestMoves {
+			m.fewestMoves = new(m.game.Moves())
+		}
+	}
+}
+
+func (m Model) recordSummary() string {
+	return fmt.Sprintf("best %s/%s", formatRecordSeconds(m.bestSeconds), formatRecordMoves(m.fewestMoves))
+}
+
+func formatRecordSeconds(value *int) string {
+	if value == nil {
+		return "—"
+	}
+	return fmt.Sprintf("%ds", *value)
+}
+
+func formatRecordMoves(value *int) string {
+	if value == nil {
+		return "—"
+	}
+	return fmt.Sprintf("%dm", *value)
 }
 
 func (m *Model) moveCursorLeft() {
@@ -310,9 +381,10 @@ func (m Model) View() string {
 		return m.helpView()
 	}
 	var b strings.Builder
+	record := m.recordSummary()
 	b.WriteString(styleTitle.Render(fitLine(m.termW,
-		fmt.Sprintf(" SOLITAIRE DRAW 3      ⏱ %03d   moves %03d", m.elapsed, m.game.Moves()),
-		fmt.Sprintf(" SOLITAIRE DRAW 3   %03d/%03d", m.elapsed, m.game.Moves()),
+		fmt.Sprintf(" SOLITAIRE DRAW 3      ⏱ %03d   moves %03d   %s", m.elapsed, m.game.Moves(), record),
+		fmt.Sprintf(" SOLITAIRE DRAW 3   %03d/%03d %s", m.elapsed, m.game.Moves(), record),
 	)))
 	b.WriteString("\n\n")
 	b.WriteString(m.topView())

@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 	"github.com/wallymagill/mines/internal/solitaire/engine"
+	"github.com/wallymagill/mines/internal/store"
 )
 
 func TestViewRendersCoreRegions(t *testing.T) {
@@ -18,6 +19,24 @@ func TestViewRendersCoreRegions(t *testing.T) {
 		if !strings.Contains(v, want) {
 			t.Fatalf("view missing %q:\n%s", want, v)
 		}
+	}
+}
+
+func TestViewShowsUnsetSolitaireRecords(t *testing.T) {
+	m := testModel(t)
+	v := m.View()
+	if !strings.Contains(v, "best —/—") {
+		t.Fatalf("view should show unset record dashes:\n%s", v)
+	}
+}
+
+func TestViewShowsSavedSolitaireRecords(t *testing.T) {
+	scores := store.New(t.TempDir() + "/scores.json")
+	scores.RecordSolitaireDraw3(341, 128)
+	m := testModelWithStore(t, scores)
+	v := m.View()
+	if !strings.Contains(v, "best 341s/128m") {
+		t.Fatalf("view should show saved records:\n%s", v)
 	}
 }
 
