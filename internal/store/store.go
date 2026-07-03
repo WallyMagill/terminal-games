@@ -13,6 +13,24 @@ import (
 // best completion time in seconds.
 type Scores map[string]int
 
+const recordsVersion = 2
+const solitaireDraw3Key = "draw3"
+
+type Records struct {
+	Version   int                        `json:"version"`
+	Mines     map[string]TimeRecord      `json:"mines,omitempty"`
+	Solitaire map[string]SolitaireRecord `json:"solitaire,omitempty"`
+}
+
+type TimeRecord struct {
+	BestSeconds int `json:"bestSeconds"`
+}
+
+type SolitaireRecord struct {
+	BestSeconds *int `json:"bestSeconds,omitempty"`
+	FewestMoves *int `json:"fewestMoves,omitempty"`
+}
+
 // Store reads and writes a single scores file.
 type Store struct {
 	path string
@@ -31,42 +49,112 @@ func DefaultPath() (string, error) {
 	return filepath.Join(dir, "mines", "scores.json"), nil
 }
 
-// Load returns saved scores. A missing or corrupted file yields empty scores —
-// score I/O must never take the game down. Entries with values outside
-// [0, 999] are dropped: the UI timer starts at 0 and caps at 999, so such
-// values only come from hand edits or valid-JSON corruption, and a negative
-// "best" would permanently block every legitimate future record.
-func (s *Store) Load() Scores {
+// LoadRecords returns saved records. A missing or corrupted file yields empty
+// records — score I/O must never take the game down. Old Mines-only score
+// files are migrated in memory. Entries with values outside [0, 999] are
+// dropped: the Mines UI timer starts at 0 and caps at 999, so such values only
+// come from hand edits or valid-JSON corruption, and a negative "best" would
+// permanently block every legitimate future record.
+func (s *Store) LoadRecords() Records {
 	data, err := os.ReadFile(s.path)
 	if err != nil {
-		return Scores{}
+		return emptyRecords()
 	}
-	var sc Scores
-	if err := json.Unmarshal(data, &sc); err != nil || sc == nil {
-		return Scores{}
+	var records Records
+	if err := json.Unmarshal(data, &records); err == nil && records.Version == recordsVersion {
+		return sanitizeRecords(records)
 	}
-	for key, secs := range sc {
-		if secs < 0 || secs > 999 {
-			delete(sc, key)
+	var old Scores
+	if err := json.Unmarshal(data, &old); err != nil || old == nil {
+		return emptyRecords()
+	}
+	records = emptyRecords()
+	for key, secs := range old {
+		if secs >= 0 && secs <= 999 {
+			records.Mines[key] = TimeRecord{BestSeconds: secs}
 		}
 	}
-	return sc
+	return records
 }
 
-// Save writes scores atomically (temp file + rename). The temp file is
-// unique to this call: every process shares one scores path, so two
-// instances saving concurrently (two terminal windows) must never share a
-// temp file — interleaved writes into one shared temp could promote a
-// hybrid of two payloads. With a unique temp per call, concurrent saves
-// degrade to last-writer-wins and the promoted file is always one writer's
-// complete payload. The data is not fsynced before the rename: losing the
-// very last save to a crash is an accepted tradeoff for a scores file.
+func emptyRecords() Records {
+	return Records{
+		Version:   recordsVersion,
+		Mines:     map[string]TimeRecord{},
+		Solitaire: map[string]SolitaireRecord{},
+	}
+}
+
+func sanitizeRecords(records Records) Records {
+	if records.Version != recordsVersion {
+		return emptyRecords()
+	}
+	if records.Mines == nil {
+		records.Mines = map[string]TimeRecord{}
+	}
+	if records.Solitaire == nil {
+		records.Solitaire = map[string]SolitaireRecord{}
+	}
+	for key, rec := range records.Mines {
+		if rec.BestSeconds < 0 || rec.BestSeconds > 999 {
+			delete(records.Mines, key)
+		}
+	}
+	for key, rec := range records.Solitaire {
+		badTime := rec.BestSeconds != nil && (*rec.BestSeconds < 0 || *rec.BestSeconds > 999)
+		badMoves := rec.FewestMoves != nil && *rec.FewestMoves < 0
+		if badTime || badMoves || (rec.BestSeconds == nil && rec.FewestMoves == nil) {
+			delete(records.Solitaire, key)
+		}
+	}
+	return records
+}
+
+// Load returns saved Mines scores.
+func (s *Store) Load() Scores {
+	records := s.LoadRecords()
+	scores := Scores{}
+	for key, rec := range records.Mines {
+		scores[key] = rec.BestSeconds
+	}
+	return scores
+}
+
+// SaveRecords writes records atomically (temp file + rename).
+func (s *Store) SaveRecords(records Records) error {
+	records.Version = recordsVersion
+	if records.Mines == nil {
+		records.Mines = map[string]TimeRecord{}
+	}
+	if records.Solitaire == nil {
+		records.Solitaire = map[string]SolitaireRecord{}
+	}
+	return s.saveJSON(records)
+}
+
+// Save writes Mines scores.
 func (s *Store) Save(sc Scores) error {
+	records := emptyRecords()
+	for key, secs := range sc {
+		records.Mines[key] = TimeRecord{BestSeconds: secs}
+	}
+	return s.SaveRecords(records)
+}
+
+// saveJSON writes v atomically (temp file + rename). The temp file is unique
+// to this call: every process shares one scores path, so two instances saving
+// concurrently (two terminal windows) must never share a temp file —
+// interleaved writes into one shared temp could promote a hybrid of two
+// payloads. With a unique temp per call, concurrent saves degrade to
+// last-writer-wins and the promoted file is always one writer's complete
+// payload. The data is not fsynced before the rename: losing the very last
+// save to a crash is an accepted tradeoff for a scores file.
+func (s *Store) saveJSON(v any) error {
 	dir := filepath.Dir(s.path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(sc, "", "  ")
+	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -127,14 +215,42 @@ func (s *Store) sweepStaleTemps(dir string) {
 	}
 }
 
-// RecordIfBest saves secs under key if it beats the current best.
+// RecordMinesBest saves secs under key if it beats the current Mines best.
+// It reports whether a new record was achieved; on error the record was
+// achieved but could not be persisted.
+func (s *Store) RecordMinesBest(key string, secs int) (bool, error) {
+	records := s.LoadRecords()
+	if best, ok := records.Mines[key]; ok && best.BestSeconds <= secs {
+		return false, nil
+	}
+	records.Mines[key] = TimeRecord{BestSeconds: secs}
+	return true, s.SaveRecords(records)
+}
+
+func (s *Store) RecordSolitaireDraw3(secs, moves int) (bool, bool, error) {
+	records := s.LoadRecords()
+	rec := records.Solitaire[solitaireDraw3Key]
+	newBestTime := rec.BestSeconds == nil || secs < *rec.BestSeconds
+	newFewestMoves := rec.FewestMoves == nil || moves < *rec.FewestMoves
+	if !newBestTime && !newFewestMoves {
+		return false, false, nil
+	}
+	if newBestTime {
+		best := secs
+		rec.BestSeconds = &best
+	}
+	if newFewestMoves {
+		fewest := moves
+		rec.FewestMoves = &fewest
+	}
+	records.Solitaire[solitaireDraw3Key] = rec
+	err := s.SaveRecords(records)
+	return newBestTime, newFewestMoves, err
+}
+
+// RecordIfBest saves secs under key if it beats the current Mines best.
 // It reports whether a new record was achieved; on error the record was
 // achieved but could not be persisted.
 func (s *Store) RecordIfBest(key string, secs int) (bool, error) {
-	sc := s.Load()
-	if best, ok := sc[key]; ok && best <= secs {
-		return false, nil
-	}
-	sc[key] = secs
-	return true, s.Save(sc)
+	return s.RecordMinesBest(key, secs)
 }

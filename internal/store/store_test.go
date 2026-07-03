@@ -115,6 +115,107 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestLoadRecordsMigratesOldMinesScores(t *testing.T) {
+	s, path := tempStore(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw := `{"beginner":42,"expert":311}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := s.LoadRecords()
+	if got.Version != 2 {
+		t.Fatalf("version = %d, want 2", got.Version)
+	}
+	if got.Mines["beginner"].BestSeconds != 42 || got.Mines["expert"].BestSeconds != 311 {
+		t.Fatalf("migrated mines records = %#v", got.Mines)
+	}
+}
+
+func TestSaveRecordsLoadRecordsRoundTrip(t *testing.T) {
+	s, _ := tempStore(t)
+	bestSeconds := 240
+	fewestMoves := 91
+	want := store.Records{
+		Mines: map[string]store.TimeRecord{
+			"expert": {BestSeconds: 311},
+		},
+		Solitaire: map[string]store.SolitaireRecord{
+			"draw3": {BestSeconds: &bestSeconds, FewestMoves: &fewestMoves},
+		},
+	}
+	if err := s.SaveRecords(want); err != nil {
+		t.Fatal(err)
+	}
+
+	got := s.LoadRecords()
+	if got.Version != 2 {
+		t.Fatalf("version = %d, want 2", got.Version)
+	}
+	if got.Mines["expert"].BestSeconds != 311 {
+		t.Fatalf("mines records = %#v, want expert best 311", got.Mines)
+	}
+	draw3 := got.Solitaire["draw3"]
+	if draw3.BestSeconds == nil || *draw3.BestSeconds != 240 {
+		t.Fatalf("draw3 best seconds = %#v, want 240", draw3.BestSeconds)
+	}
+	if draw3.FewestMoves == nil || *draw3.FewestMoves != 91 {
+		t.Fatalf("draw3 fewest moves = %#v, want 91", draw3.FewestMoves)
+	}
+}
+
+func TestRecordMinesBestPreservesSolitaireRecords(t *testing.T) {
+	s, _ := tempStore(t)
+	bestSeconds := 240
+	fewestMoves := 91
+	if err := s.SaveRecords(store.Records{
+		Solitaire: map[string]store.SolitaireRecord{
+			"draw3": {BestSeconds: &bestSeconds, FewestMoves: &fewestMoves},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := s.RecordMinesBest("beginner", 42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !saved {
+		t.Fatal("RecordMinesBest() = false, want true for first mines record")
+	}
+	got := s.LoadRecords()
+	if got.Mines["beginner"].BestSeconds != 42 {
+		t.Fatalf("mines records = %#v, want beginner best 42", got.Mines)
+	}
+	draw3 := got.Solitaire["draw3"]
+	if draw3.BestSeconds == nil || *draw3.BestSeconds != 240 || draw3.FewestMoves == nil || *draw3.FewestMoves != 91 {
+		t.Fatalf("draw3 record = %+v, want preserved 240s/91 moves", draw3)
+	}
+}
+
+func TestRecordSolitaireDraw3KeepsIndependentBests(t *testing.T) {
+	s, _ := tempStore(t)
+	newTime, newMoves, err := s.RecordSolitaireDraw3(300, 150)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !newTime || !newMoves {
+		t.Fatalf("first record = (%v,%v), want both true", newTime, newMoves)
+	}
+	newTime, newMoves, err = s.RecordSolitaireDraw3(320, 120)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newTime || !newMoves {
+		t.Fatalf("second record = (%v,%v), want only moves", newTime, newMoves)
+	}
+	rec := s.LoadRecords().Solitaire["draw3"]
+	if rec.BestSeconds == nil || *rec.BestSeconds != 300 || rec.FewestMoves == nil || *rec.FewestMoves != 120 {
+		t.Fatalf("draw3 record = %+v, want 300s/120 moves", rec)
+	}
+}
+
 // Saves use a unique temp name per call, so "no temp left behind" is
 // pinned by listing the directory rather than statting one fixed path.
 func TestSaveLeavesNoTempFile(t *testing.T) {
@@ -258,8 +359,8 @@ func TestConcurrentSavesNeverCorruptScoresFile(t *testing.T) {
 			if err != nil || len(data) == 0 {
 				continue // not promoted yet
 			}
-			var sc map[string]int
-			if jerr := json.Unmarshal(data, &sc); jerr != nil {
+			var records store.Records
+			if jerr := json.Unmarshal(data, &records); jerr != nil {
 				corrupt, corruptErr = data, jerr
 				return
 			}
