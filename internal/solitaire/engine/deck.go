@@ -1,6 +1,6 @@
 package engine
 
-import "math/rand/v2"
+import "math/rand"
 
 func standardDeck() []Card {
 	deck := make([]Card, 0, 52)

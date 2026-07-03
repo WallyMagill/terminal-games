@@ -2,7 +2,7 @@ package engine
 
 import (
 	"errors"
-	"math/rand/v2"
+	"math/rand"
 )
 
 var ErrNilRNG = errors.New("rng must not be nil")

@@ -2,11 +2,11 @@ package engine
 
 import (
 	"errors"
-	"math/rand/v2"
+	"math/rand"
 	"testing"
 )
 
-func testRNG() *rand.Rand { return rand.New(rand.NewPCG(1, 2)) }
+func testRNG() *rand.Rand { return rand.New(rand.NewSource(1)) }
 
 func TestNewRequiresRNG(t *testing.T) {
 	if _, err := New(nil); !errors.Is(err, ErrNilRNG) {
