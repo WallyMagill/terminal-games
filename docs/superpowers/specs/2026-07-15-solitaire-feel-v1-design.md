@@ -1,7 +1,7 @@
 # Solitaire Feel v1 — Design
 
 **Date:** 2026-07-15  
-**Status:** Draft for user review  
+**Status:** Approved; implementation plan written  
 **Goal:** Make Klondike Draw 3 feel clean and intentional on keyboard: vim navigation that prefers useful cards, soft stuck detection when a deal stalls, and hints that suggest good plays instead of shallow or wrong-ranked legal moves — without turning the game into a phone clone or a hard loss screen.
 
 **Related:** builds on the existing Solitaire engine/UI and the usability-assist layer (legal moves, smart sole-destination move, safe auto-foundation, undo, basic hints, no-progress stock-pass tracking). Does not rewrite Mines.
