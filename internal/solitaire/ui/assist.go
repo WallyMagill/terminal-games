@@ -217,19 +217,17 @@ func suitName(suit engine.Suit) string {
 	}
 }
 
-// destinationRank orders a card's candidate destinations: reveals first, then
-// safe foundation, then tableau, then unsafe foundation. All moves from one
-// source share RevealsCard, so within a selection the first clause is a tie.
+// destinationRank orders a card's candidate destinations: safe foundation,
+// then tableau, then unsafe foundation. RevealsCard is a property of the
+// source, shared by every move in a selection, so it plays no part here.
 func destinationRank(move engine.Move) int {
 	switch {
-	case move.RevealsCard:
-		return 0
 	case move.Destination.Kind == engine.Foundation && move.Safe:
-		return 1
+		return 0
 	case move.Destination.Kind == engine.Tableau:
-		return 2
+		return 1
 	default:
-		return 3
+		return 2
 	}
 }
 

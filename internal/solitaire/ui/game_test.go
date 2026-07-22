@@ -884,10 +884,12 @@ func TestVerticalNavigationSkipsFaceDownCards(t *testing.T) {
 }
 
 func TestSelectedDestinationsSortedByPriority(t *testing.T) {
+	// RevealsCard is a source-level property, so all moves share it; the sort
+	// must still order safe foundation > tableau > unsafe foundation.
 	moves := []engine.Move{
-		{Destination: engine.Location{Kind: engine.Foundation, Pile: 0}},
-		{Destination: engine.Location{Kind: engine.Tableau, Pile: 2}},
-		{Destination: engine.Location{Kind: engine.Foundation, Pile: 1}, Safe: true},
+		{Destination: engine.Location{Kind: engine.Foundation, Pile: 0}, RevealsCard: true},
+		{Destination: engine.Location{Kind: engine.Tableau, Pile: 2}, RevealsCard: true},
+		{Destination: engine.Location{Kind: engine.Foundation, Pile: 1}, Safe: true, RevealsCard: true},
 	}
 	sorted := sortMovesByPriority(moves)
 	if !(sorted[0].Safe && sorted[0].Destination.Kind == engine.Foundation) {
