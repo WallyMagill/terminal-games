@@ -24,19 +24,19 @@ func tileStyle(v int) lipgloss.Style {
 	s := lipgloss.NewStyle().Width(cellInnerWidth).Align(lipgloss.Right)
 	switch {
 	case v == 0:
-		return s.Foreground(lipgloss.Color("240"))
+		return s.Foreground(lipgloss.Color("238"))
 	case v <= 4:
-		return s.Foreground(lipgloss.Color("252"))
+		return s.Foreground(lipgloss.Color("250"))
 	case v <= 16:
-		return s.Foreground(lipgloss.Color("228"))
+		return s.Foreground(lipgloss.Color("222"))
 	case v <= 64:
 		return s.Foreground(lipgloss.Color("214"))
 	case v <= 256:
 		return s.Foreground(lipgloss.Color("208"))
 	case v <= 1024:
-		return s.Foreground(lipgloss.Color("202"))
+		return s.Bold(true).Foreground(lipgloss.Color("203"))
 	default:
-		return s.Bold(true).Foreground(lipgloss.Color("196"))
+		return s.Bold(true).Foreground(lipgloss.Color("227"))
 	}
 }
 
