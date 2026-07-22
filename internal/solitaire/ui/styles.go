@@ -21,6 +21,7 @@ var (
 	styleCursor   = lipgloss.NewStyle().Reverse(true)
 	styleSelected = lipgloss.NewStyle().Bold(true).Reverse(true)
 	styleErr      = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	styleMoveHint = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("28")).Foreground(lipgloss.Color("231"))
 )
 
 func fitLine(termW int, full, compact string) string { return uiutil.FitLine(termW, full, compact) }

@@ -989,3 +989,98 @@ func TestGameOverNewDealResets(t *testing.T) {
 		t.Fatalf("new deal must reset moves, got %d", m.game.Moves())
 	}
 }
+
+// movesModel builds a position with exactly two productive sources:
+// A♠ on tableau 0 (foundation move) and the draw-pile 8♠ (plays on 9♦).
+func movesModel(t *testing.T) Model {
+	t.Helper()
+	m := testModel(t)
+	rv := reflect.ValueOf(m.game).Elem()
+	setUnexported(rv.FieldByName("stock"), []engine.Card(nil))
+	setUnexported(rv.FieldByName("waste"), []engine.Card{{Suit: engine.Spades, Rank: engine.Eight}})
+	var tableau [7][]engine.TableauCard
+	tableau[0] = []engine.TableauCard{{Card: engine.Card{Suit: engine.Spades, Rank: engine.Ace}, FaceUp: true}}
+	tableau[1] = []engine.TableauCard{{Card: engine.Card{Suit: engine.Diamonds, Rank: engine.Nine}, FaceUp: true}}
+	setUnexported(rv.FieldByName("tableau"), tableau)
+	return m
+}
+
+func TestShowMovesHighlightsProductiveSources(t *testing.T) {
+	m := movesModel(t)
+	m, _ = m.Update(key("v"))
+	if !m.showMoves {
+		t.Fatal("v must enable showMoves")
+	}
+	if !m.assisted || m.assistReason != "moves" {
+		t.Fatalf("v must mark assisted/moves, got %v/%q", m.assisted, m.assistReason)
+	}
+	wantSources := []engine.Location{
+		{Kind: engine.Tableau, Pile: 0, Index: 0},
+		{Kind: engine.Waste},
+	}
+	for _, want := range wantSources {
+		if !m.moveSources[want] {
+			t.Fatalf("source %+v missing from moveSources %v", want, m.moveSources)
+		}
+	}
+	if m.moveSources[engine.Location{Kind: engine.Tableau, Pile: 1, Index: 0}] {
+		t.Fatal("9♦ has no productive move and must not highlight")
+	}
+	if !strings.Contains(m.message, "moves · any key to dismiss") {
+		t.Fatalf("status = %q", m.message)
+	}
+}
+
+func TestShowMovesKeepDrawingMessage(t *testing.T) {
+	m := testModel(t)
+	rv := reflect.ValueOf(m.game).Elem()
+	setUnexported(rv.FieldByName("waste"), []engine.Card(nil))
+	setUnexported(rv.FieldByName("stock"), []engine.Card{
+		{Suit: engine.Clubs, Rank: engine.Five},
+		{Suit: engine.Clubs, Rank: engine.Ace},
+	})
+	var tableau [7][]engine.TableauCard
+	tableau[0] = []engine.TableauCard{{Card: engine.Card{Suit: engine.Hearts, Rank: engine.Nine}, FaceUp: true}}
+	setUnexported(rv.FieldByName("tableau"), tableau)
+	if m.game.DeadEnd() {
+		t.Fatal("fixture must not be a dead end (ace surfaces on draw)")
+	}
+	m, _ = m.Update(key("v"))
+	if m.showMoves {
+		t.Fatal("no board moves: must not enable highlights")
+	}
+	if m.message != "no moves on board — keep drawing" {
+		t.Fatalf("status = %q", m.message)
+	}
+	if !m.assisted || m.assistReason != "moves" {
+		t.Fatal("v marks assisted even in keep-drawing case")
+	}
+}
+
+func TestShowMovesDismissedByNextKeyWhichStillActs(t *testing.T) {
+	m := movesModel(t)
+	m, _ = m.Update(key("v"))
+	if !m.showMoves {
+		t.Fatal("expected showMoves on")
+	}
+	m.cursor = cursor{region: regionTableau, col: 1}
+	m, _ = m.Update(key("h"))
+	if m.showMoves || m.moveSources != nil {
+		t.Fatal("any key must clear highlights")
+	}
+	if m.cursor.col != 0 {
+		t.Fatalf("the dismissing key must still act (h moves left), cursor %+v", m.cursor)
+	}
+}
+
+func TestShowMovesInertOnGameOver(t *testing.T) {
+	m := forceDeadEnd(t, testModel(t))
+	m, _ = m.Update(key("d"))
+	if !m.gameOver {
+		t.Fatal("expected game over")
+	}
+	m, _ = m.Update(key("v"))
+	if m.showMoves {
+		t.Fatal("v must be inert on game over")
+	}
+}

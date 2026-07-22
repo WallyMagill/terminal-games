@@ -46,6 +46,8 @@ type Model struct {
 	saveErr           bool
 	recordedWin       bool
 	gameOver          bool
+	showMoves         bool
+	moveSources       map[engine.Location]bool
 	bestSeconds       *int
 	fewestMoves       *int
 	undoStack         []*engine.Game
@@ -138,6 +140,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(k string) (Model, tea.Cmd) {
+	if m.showMoves {
+		m.showMoves = false
+		m.moveSources = nil
+		m.message = ""
+	}
 	if m.gameOver {
 		switch k {
 		case "n":
@@ -166,6 +173,8 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		return m.autoFoundationAll()
 	case "u":
 		return m.undo()
+	case "v":
+		return m.showPossibleMoves(), nil
 	case "tab":
 		if m.selected != nil {
 			return m.cycleSelectedDestination(1), nil
@@ -781,6 +790,7 @@ func (m Model) helpView() string {
 		"",
 		" arrows/hjkl  move",
 		" w / s / f    jump to draw pile / deck / foundations",
+		" v            show possible moves (assisted)",
 		" spc/enter    select card or move selection",
 		" d            draw 3 / recycle deck",
 		" u            undo last move (assisted)",
@@ -802,6 +812,9 @@ func (m Model) helpView() string {
 func (m Model) decorate(r region, col, row int, token string) string {
 	if m.cursor.region == r && m.cursor.col == col && m.cursor.row == row {
 		return styleCursor.Render(token)
+	}
+	if m.showMoves && m.moveSources[cursor{region: r, col: col, row: row}.location()] {
+		return styleMoveHint.Render(token)
 	}
 	if m.selected != nil && r == regionTableau && m.selected.Kind == engine.Tableau &&
 		m.selected.Pile == col && row >= m.selected.Index {

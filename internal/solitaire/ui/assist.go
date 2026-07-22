@@ -107,6 +107,29 @@ func matchesSelectedDestination(moveDst, cursorDst engine.Location) bool {
 	return moveDst == cursorDst
 }
 
+// showPossibleMoves highlights every source with a productive move. Any key
+// dismisses. Using it marks the run assisted — it is help, like undo.
+func (m Model) showPossibleMoves() Model {
+	m = m.clearSelection()
+	if m.game.Status() == engine.Playing {
+		m.assisted = true
+		m.assistReason = "moves"
+	}
+	moves := m.game.ProductiveMoves()
+	if len(moves) == 0 {
+		m.message = "no moves on board — keep drawing"
+		return m
+	}
+	sources := map[engine.Location]bool{}
+	for _, move := range moves {
+		sources[move.Source] = true
+	}
+	m.showMoves = true
+	m.moveSources = sources
+	m.message = fmt.Sprintf("%d moves · any key to dismiss", len(moves))
+	return m
+}
+
 func (m Model) clearSelection() Model {
 	m.selected = nil
 	m.selectedMoves = nil
