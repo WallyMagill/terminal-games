@@ -13,11 +13,12 @@ import (
 // best completion time in seconds.
 type Scores map[string]int
 
-const recordsVersion = 2
+const recordsVersion = 3
 
 const (
 	solitaireDraw3Key         = "draw3"
 	solitaireDraw3AssistedKey = "draw3-assisted"
+	g2048ClassicKey           = "classic"
 )
 
 type SolitaireRecordMode int
@@ -31,6 +32,7 @@ type Records struct {
 	Version   int                        `json:"version"`
 	Mines     map[string]TimeRecord      `json:"mines,omitempty"`
 	Solitaire map[string]SolitaireRecord `json:"solitaire,omitempty"`
+	G2048     map[string]G2048Record     `json:"g2048,omitempty"`
 }
 
 type TimeRecord struct {
@@ -40,6 +42,11 @@ type TimeRecord struct {
 type SolitaireRecord struct {
 	BestSeconds *int `json:"bestSeconds,omitempty"`
 	FewestMoves *int `json:"fewestMoves,omitempty"`
+}
+
+type G2048Record struct {
+	BestScore int `json:"bestScore"`
+	BestTile  int `json:"bestTile"`
 }
 
 // Store reads and writes a single scores file.
@@ -72,7 +79,8 @@ func (s *Store) LoadRecords() Records {
 		return emptyRecords()
 	}
 	var records Records
-	if err := json.Unmarshal(data, &records); err == nil && records.Version == recordsVersion {
+	if err := json.Unmarshal(data, &records); err == nil && (records.Version == 2 || records.Version == 3) {
+		records.Version = recordsVersion
 		return sanitizeRecords(records)
 	}
 	var old Scores
@@ -93,6 +101,7 @@ func emptyRecords() Records {
 		Version:   recordsVersion,
 		Mines:     map[string]TimeRecord{},
 		Solitaire: map[string]SolitaireRecord{},
+		G2048:     map[string]G2048Record{},
 	}
 }
 
@@ -106,6 +115,9 @@ func sanitizeRecords(records Records) Records {
 	if records.Solitaire == nil {
 		records.Solitaire = map[string]SolitaireRecord{}
 	}
+	if records.G2048 == nil {
+		records.G2048 = map[string]G2048Record{}
+	}
 	for key, rec := range records.Mines {
 		if rec.BestSeconds < 0 || rec.BestSeconds > 999 {
 			delete(records.Mines, key)
@@ -116,6 +128,11 @@ func sanitizeRecords(records Records) Records {
 		badMoves := rec.FewestMoves != nil && *rec.FewestMoves < 0
 		if badTime || badMoves || (rec.BestSeconds == nil && rec.FewestMoves == nil) {
 			delete(records.Solitaire, key)
+		}
+	}
+	for key, rec := range records.G2048 {
+		if rec.BestScore < 0 || rec.BestTile < 0 {
+			delete(records.G2048, key)
 		}
 	}
 	return records
@@ -139,6 +156,9 @@ func (s *Store) SaveRecords(records Records) error {
 	}
 	if records.Solitaire == nil {
 		records.Solitaire = map[string]SolitaireRecord{}
+	}
+	if records.G2048 == nil {
+		records.G2048 = map[string]G2048Record{}
 	}
 	return s.saveJSON(records)
 }
@@ -280,4 +300,33 @@ func (s *Store) RecordSolitaireDraw3Mode(mode SolitaireRecordMode, secs, moves i
 // achieved but could not be persisted.
 func (s *Store) RecordIfBest(key string, secs int) (bool, error) {
 	return s.RecordMinesBest(key, secs)
+}
+
+func (s *Store) LoadG2048Classic() G2048Record {
+	return s.LoadRecords().G2048[g2048ClassicKey]
+}
+
+// RecordG2048Classic updates best score and best tile when improved.
+func (s *Store) RecordG2048Classic(score, highestTile int) (newBestScore, newBestTile bool, err error) {
+	if score < 0 || highestTile < 0 {
+		return false, false, nil
+	}
+	records := s.LoadRecords()
+	if records.G2048 == nil {
+		records.G2048 = map[string]G2048Record{}
+	}
+	rec := records.G2048[g2048ClassicKey]
+	if score > rec.BestScore {
+		rec.BestScore = score
+		newBestScore = true
+	}
+	if highestTile > rec.BestTile {
+		rec.BestTile = highestTile
+		newBestTile = true
+	}
+	if !newBestScore && !newBestTile {
+		return false, false, nil
+	}
+	records.G2048[g2048ClassicKey] = rec
+	return newBestScore, newBestTile, s.SaveRecords(records)
 }

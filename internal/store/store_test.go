@@ -125,8 +125,8 @@ func TestLoadRecordsMigratesOldMinesScores(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := s.LoadRecords()
-	if got.Version != 2 {
-		t.Fatalf("version = %d, want 2", got.Version)
+	if got.Version != 3 {
+		t.Fatalf("version = %d, want 3", got.Version)
 	}
 	if got.Mines["beginner"].BestSeconds != 42 || got.Mines["expert"].BestSeconds != 311 {
 		t.Fatalf("migrated mines records = %#v", got.Mines)
@@ -150,8 +150,8 @@ func TestSaveRecordsLoadRecordsRoundTrip(t *testing.T) {
 	}
 
 	got := s.LoadRecords()
-	if got.Version != 2 {
-		t.Fatalf("version = %d, want 2", got.Version)
+	if got.Version != 3 {
+		t.Fatalf("version = %d, want 3", got.Version)
 	}
 	if got.Mines["expert"].BestSeconds != 311 {
 		t.Fatalf("mines records = %#v, want expert best 311", got.Mines)
@@ -531,5 +531,106 @@ func TestSweepWorksInGlobMetacharacterDir(t *testing.T) {
 
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Errorf("stale temp %q survived a successful save in a metacharacter dir", stale)
+	}
+}
+
+func TestLoadRecordsMigratesV2ToV3Shape(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/scores.json"
+	bestSeconds := 240
+	fewestMoves := 91
+	raw := []byte(`{
+  "version": 2,
+  "mines": {"beginner": {"bestSeconds": 42}},
+  "solitaire": {"draw3": {"bestSeconds": 240, "fewestMoves": 91}}
+}`)
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := store.New(path)
+	got := s.LoadRecords()
+	if got.Version != 3 {
+		t.Fatalf("version = %d, want 3", got.Version)
+	}
+	if got.Mines["beginner"].BestSeconds != 42 {
+		t.Fatalf("mines = %#v", got.Mines)
+	}
+	draw3 := got.Solitaire["draw3"]
+	if draw3.BestSeconds == nil || *draw3.BestSeconds != bestSeconds {
+		t.Fatalf("solitaire time = %#v", draw3)
+	}
+	if draw3.FewestMoves == nil || *draw3.FewestMoves != fewestMoves {
+		t.Fatalf("solitaire moves = %#v", draw3)
+	}
+	if len(got.G2048) != 0 {
+		t.Fatalf("g2048 should be empty, got %#v", got.G2048)
+	}
+}
+
+func TestRecordG2048ClassicPreservesOtherGames(t *testing.T) {
+	s := store.New(t.TempDir() + "/scores.json")
+	if _, err := s.RecordMinesBest("beginner", 42); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.RecordSolitaireDraw3(100, 50); err != nil {
+		t.Fatal(err)
+	}
+	newScore, newTile, err := s.RecordG2048Classic(1200, 256)
+	if err != nil || !newScore || !newTile {
+		t.Fatalf("first record = %v %v %v", newScore, newTile, err)
+	}
+	got := s.LoadRecords()
+	if got.Mines["beginner"].BestSeconds != 42 {
+		t.Fatalf("mines wiped: %#v", got.Mines)
+	}
+	if got.Solitaire["draw3"].BestSeconds == nil {
+		t.Fatal("solitaire wiped")
+	}
+	rec := s.LoadG2048Classic()
+	if rec.BestScore != 1200 || rec.BestTile != 256 {
+		t.Fatalf("g2048 = %#v", rec)
+	}
+}
+
+func TestRecordG2048ClassicOnlyImproves(t *testing.T) {
+	s := store.New(t.TempDir() + "/scores.json")
+	if _, _, err := s.RecordG2048Classic(1000, 512); err != nil {
+		t.Fatal(err)
+	}
+	ns, nt, err := s.RecordG2048Classic(900, 256)
+	if err != nil || ns || nt {
+		t.Fatalf("worse values must not update: %v %v %v", ns, nt, err)
+	}
+	ns, nt, err = s.RecordG2048Classic(1000, 1024)
+	if err != nil || ns || !nt {
+		t.Fatalf("same score higher tile: %v %v %v", ns, nt, err)
+	}
+	ns, nt, err = s.RecordG2048Classic(2000, 1024)
+	if err != nil || !ns || nt {
+		t.Fatalf("higher score same tile: %v %v %v", ns, nt, err)
+	}
+	rec := s.LoadG2048Classic()
+	if rec.BestScore != 2000 || rec.BestTile != 1024 {
+		t.Fatalf("rec = %#v", rec)
+	}
+}
+
+func TestSaveRecordsWritesVersion3(t *testing.T) {
+	path := t.TempDir() + "/scores.json"
+	s := store.New(path)
+	if _, _, err := s.RecordG2048Classic(10, 4); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	ver, ok := raw["version"].(float64)
+	if !ok || int(ver) != 3 {
+		t.Fatalf("version = %v, want 3", raw["version"])
 	}
 }
