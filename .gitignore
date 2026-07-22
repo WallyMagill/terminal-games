@@ -1,4 +1,5 @@
 /mines
+/games
 *.test
 coverage.out
 .claude/
