@@ -184,8 +184,18 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		fresh.termW = m.termW
 		fresh.termH = m.termH
 		return fresh, nil
-	case "left":
+	case "left", "h":
 		m.moveCursorLeft()
+	case "w":
+		m.cursor = cursor{region: regionWaste}
+	case "s":
+		m.cursor = cursor{region: regionStock}
+	case "f":
+		if m.cursor.region == regionFoundation {
+			m.cursor.col = (m.cursor.col + 1) % 4
+		} else {
+			m.cursor = cursor{region: regionFoundation, col: 0}
+		}
 	case "right", "l":
 		m.moveCursorRight()
 	case "up", "k":
@@ -258,7 +268,7 @@ func (m Model) activate() (Model, tea.Cmd) {
 			return m.startTimerIfNeeded(changed)
 		default:
 			m.selected = &loc
-			m.selectedMoves = append([]engine.Move(nil), moves...)
+			m.selectedMoves = sortMovesByPriority(moves)
 			m = m.focusDestination(m.selectedMoves[0].Destination)
 			m.message = "Selected"
 			return m, nil
@@ -479,9 +489,14 @@ func (m *Model) moveCursorRight() {
 func (m *Model) moveCursorUp() {
 	switch m.cursor.region {
 	case regionTableau:
-		if m.cursor.row > 0 {
-			m.cursor.row--
-		} else if m.cursor.col < 4 {
+		cards := m.game.Tableau(m.cursor.col)
+		for row := m.cursor.row - 1; row >= 0; row-- {
+			if row < len(cards) && cards[row].FaceUp {
+				m.cursor.row = row
+				return
+			}
+		}
+		if m.cursor.col < 4 {
 			m.cursor = cursor{region: regionFoundation, col: m.cursor.col}
 		} else {
 			m.cursor = cursor{region: regionWaste}
@@ -493,14 +508,17 @@ func (m *Model) moveCursorDown() {
 	switch m.cursor.region {
 	case regionStock, regionWaste:
 		m.cursor = cursor{region: regionTableau}
-		m.clampTableauRow()
+		m.clampTableauRowToPlayable()
 	case regionFoundation:
 		m.cursor = cursor{region: regionTableau, col: m.cursor.col}
-		m.clampTableauRow()
+		m.clampTableauRowToPlayable()
 	case regionTableau:
 		cards := m.game.Tableau(m.cursor.col)
-		if m.cursor.row < len(cards)-1 {
-			m.cursor.row++
+		for row := m.cursor.row + 1; row < len(cards); row++ {
+			if cards[row].FaceUp {
+				m.cursor.row = row
+				return
+			}
 		}
 	}
 }
@@ -709,7 +727,8 @@ func (m Model) helpView() string {
 	lines := []string{
 		" Solitaire Draw 3",
 		"",
-		" arrows/jkl   move",
+		" arrows/hjkl  move",
+		" w / s / f    jump to draw pile / deck / foundations",
 		" spc/enter    select card or move selection",
 		" d            draw 3 / recycle deck",
 		" u            undo last move (assisted)",

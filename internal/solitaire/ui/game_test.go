@@ -826,3 +826,73 @@ func TestNumberKeysJumpToTableauColumns(t *testing.T) {
 func setUnexported(field reflect.Value, value any) {
 	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
 }
+
+func TestHMovesCursorLeft(t *testing.T) {
+	m := testModel(t)
+	m.cursor = cursor{region: regionTableau, col: 3}
+	m, _ = m.Update(key("h"))
+	if m.cursor.region != regionTableau || m.cursor.col != 2 {
+		t.Fatalf("h from tableau col 3 = %+v, want col 2", m.cursor)
+	}
+}
+
+func TestJumpKeysReachRegions(t *testing.T) {
+	m := testModel(t)
+	m, _ = m.Update(key("w"))
+	if m.cursor.region != regionWaste {
+		t.Fatalf("w = %+v, want draw pile", m.cursor)
+	}
+	m, _ = m.Update(key("s"))
+	if m.cursor.region != regionStock {
+		t.Fatalf("s = %+v, want deck", m.cursor)
+	}
+	m, _ = m.Update(key("f"))
+	if m.cursor.region != regionFoundation || m.cursor.col != 0 {
+		t.Fatalf("f = %+v, want foundation 0", m.cursor)
+	}
+	m, _ = m.Update(key("f"))
+	if m.cursor.col != 1 {
+		t.Fatalf("second f = %+v, want foundation 1", m.cursor)
+	}
+	for range 3 {
+		m, _ = m.Update(key("f"))
+	}
+	if m.cursor.col != 0 {
+		t.Fatalf("f must wrap 4→1, got %+v", m.cursor)
+	}
+}
+
+func TestVerticalNavigationSkipsFaceDownCards(t *testing.T) {
+	m := testModel(t)
+	// Column 3 deals rows 0-2 face-down, row 3 face-up.
+	m.cursor = cursor{region: regionTableau, col: 3, row: 3}
+	m, _ = m.Update(key("k"))
+	if m.cursor.region == regionTableau && m.cursor.row < 3 && !m.game.Tableau(3)[m.cursor.row].FaceUp {
+		t.Fatalf("up landed on face-down card: %+v", m.cursor)
+	}
+	if m.cursor.region != regionFoundation {
+		t.Fatalf("up from only face-up row must exit to foundations, got %+v", m.cursor)
+	}
+	m, _ = m.Update(key("j"))
+	if m.cursor.region != regionTableau || !m.game.Tableau(m.cursor.col)[m.cursor.row].FaceUp {
+		t.Fatalf("down must land on a face-up card, got %+v", m.cursor)
+	}
+}
+
+func TestSelectedDestinationsSortedByPriority(t *testing.T) {
+	moves := []engine.Move{
+		{Destination: engine.Location{Kind: engine.Foundation, Pile: 0}},
+		{Destination: engine.Location{Kind: engine.Tableau, Pile: 2}},
+		{Destination: engine.Location{Kind: engine.Foundation, Pile: 1}, Safe: true},
+	}
+	sorted := sortMovesByPriority(moves)
+	if !(sorted[0].Safe && sorted[0].Destination.Kind == engine.Foundation) {
+		t.Fatalf("safe foundation must sort first: %+v", sorted[0])
+	}
+	if sorted[1].Destination.Kind != engine.Tableau {
+		t.Fatalf("tableau must sort before unsafe foundation: %+v", sorted[1])
+	}
+	if len(sorted) != 3 || len(moves) != 3 {
+		t.Fatal("sort must not add or drop moves")
+	}
+}

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/wallymagill/mines/internal/solitaire/engine"
 )
@@ -214,4 +215,28 @@ func suitName(suit engine.Suit) string {
 	default:
 		return "clubs"
 	}
+}
+
+// destinationRank orders a card's candidate destinations: reveals first, then
+// safe foundation, then tableau, then unsafe foundation. All moves from one
+// source share RevealsCard, so within a selection the first clause is a tie.
+func destinationRank(move engine.Move) int {
+	switch {
+	case move.RevealsCard:
+		return 0
+	case move.Destination.Kind == engine.Foundation && move.Safe:
+		return 1
+	case move.Destination.Kind == engine.Tableau:
+		return 2
+	default:
+		return 3
+	}
+}
+
+func sortMovesByPriority(moves []engine.Move) []engine.Move {
+	sorted := append([]engine.Move(nil), moves...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return destinationRank(sorted[i]) < destinationRank(sorted[j])
+	})
+	return sorted
 }
