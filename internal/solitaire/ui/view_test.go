@@ -314,3 +314,16 @@ func checkSolitaireLinesFit(t *testing.T, ctx, view string, termW int) {
 		}
 	}
 }
+
+func TestEmptyColumnRendersCursorSlot(t *testing.T) {
+	m := testModel(t)
+	rv := reflect.ValueOf(m.game).Elem()
+	var tableau [7][]engine.TableauCard
+	tableau[1] = []engine.TableauCard{{Card: engine.Card{Suit: engine.Clubs, Rank: engine.King}, FaceUp: true}}
+	setUnexported(rv.FieldByName("tableau"), tableau)
+	m.cursor = cursor{region: regionTableau, col: 0, row: 0}
+	view := m.tableauView()
+	if !strings.Contains(view, "[  ]") {
+		t.Fatalf("empty column must render a placeholder slot:\n%s", view)
+	}
+}

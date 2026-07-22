@@ -1084,3 +1084,30 @@ func TestShowMovesInertOnGameOver(t *testing.T) {
 		t.Fatal("v must be inert on game over")
 	}
 }
+
+func TestCursorReclampsAfterMoveEmptiesPile(t *testing.T) {
+	m := testModel(t)
+	rv := reflect.ValueOf(m.game).Elem()
+	// Ace alone on pile 2; drawable card keeps the game live after the move.
+	setUnexported(rv.FieldByName("waste"), []engine.Card(nil))
+	setUnexported(rv.FieldByName("stock"), []engine.Card{{Suit: engine.Diamonds, Rank: engine.Ace}})
+	var tableau [7][]engine.TableauCard
+	tableau[2] = []engine.TableauCard{{Card: engine.Card{Suit: engine.Spades, Rank: engine.Ace}, FaceUp: true}}
+	tableau[3] = []engine.TableauCard{
+		{Card: engine.Card{Suit: engine.Hearts, Rank: engine.Three}, FaceUp: false},
+		{Card: engine.Card{Suit: engine.Hearts, Rank: engine.Two}, FaceUp: true},
+	}
+	setUnexported(rv.FieldByName("tableau"), tableau)
+	m.cursor = cursor{region: regionTableau, col: 2, row: 0}
+	m, _ = m.Update(key("a")) // safe auto-foundation moves the ace, emptying pile 2
+	if got := m.game.TableauLen(2); got != 0 {
+		t.Fatalf("expected pile 2 emptied, len %d", got)
+	}
+	if m.cursor.region != regionTableau || m.cursor.col != 2 || m.cursor.row != 0 {
+		t.Fatalf("cursor must re-clamp to the empty pile slot, got %+v", m.cursor)
+	}
+	// The very next frame must show the cursor: placeholder slot exists at col 2.
+	if !strings.Contains(m.tableauView(), "[  ]") {
+		t.Fatal("post-move view must contain the empty-column slot the cursor sits on")
+	}
+}

@@ -303,6 +303,7 @@ func (m Model) activate() (Model, tea.Cmd) {
 				m.message = "Invalid move"
 			}
 			m.recordWinIfNeeded()
+			m.clampCursorAfterBoardChange()
 			m = m.checkDeadEnd()
 			return m.startTimerIfNeeded(changed)
 		default:
@@ -330,6 +331,7 @@ func (m Model) activate() (Model, tea.Cmd) {
 		m.message = "Invalid move"
 	}
 	m.recordWinIfNeeded()
+	m.clampCursorAfterBoardChange()
 	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(changed)
 }
@@ -370,6 +372,7 @@ func (m Model) autoFoundation() (Model, tea.Cmd) {
 		m.message = "No safe foundation move"
 	}
 	m.recordWinIfNeeded()
+	m.clampCursorAfterBoardChange()
 	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(changed)
 }
@@ -405,6 +408,7 @@ func (m Model) autoFoundationAll() (Model, tea.Cmd) {
 	m = m.noteCardProgress()
 	m.message = "Moved safe cards to foundation"
 	m.recordWinIfNeeded()
+	m.clampCursorAfterBoardChange()
 	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(true)
 }
@@ -425,6 +429,7 @@ func (m Model) undo() (Model, tea.Cmd) {
 	m.newBestMoves = false
 	m.saveErr = false
 	m.message = "Undid move"
+	m.clampCursorAfterBoardChange()
 	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(true)
 }
@@ -563,6 +568,14 @@ func (m *Model) moveCursorDown() {
 				return
 			}
 		}
+	}
+}
+
+// clampCursorAfterBoardChange snaps the cursor back onto a rendered cell the
+// moment the board mutates, so it can never point past a shortened pile.
+func (m *Model) clampCursorAfterBoardChange() {
+	if m.cursor.region == regionTableau {
+		m.clampTableauRowToPlayable()
 	}
 }
 
@@ -720,6 +733,9 @@ func (m Model) tableauView() string {
 			maxRows = len(cols[col])
 		}
 	}
+	if maxRows == 0 {
+		maxRows = 1
+	}
 	for row := range maxRows {
 		for col := range 7 {
 			token := "     "
@@ -731,6 +747,8 @@ func (m Model) tableauView() string {
 					token = hiddenToken()
 				}
 				token = m.decorate(regionTableau, col, row, token)
+			} else if row == 0 && len(cols[col]) == 0 {
+				token = m.decorate(regionTableau, col, 0, emptyToken(""))
 			}
 			b.WriteString(" ")
 			b.WriteString(token)
