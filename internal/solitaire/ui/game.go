@@ -703,7 +703,11 @@ func (m Model) topView() string {
 	b.WriteString(" ")
 	waste := m.game.WasteVisible()
 	for i := range 3 - len(waste) {
-		b.WriteString(emptyToken(""))
+		if len(waste) == 0 && i == 2 {
+			b.WriteString(m.decorate(regionWaste, 0, 0, emptyToken("")))
+		} else {
+			b.WriteString(emptyToken(""))
+		}
 		if i < 2 || len(waste) > 0 {
 			b.WriteString(" ")
 		}

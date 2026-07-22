@@ -338,3 +338,17 @@ func TestEmptyColumnRendersCursorSlot(t *testing.T) {
 		t.Fatalf("empty column must render a placeholder slot:\n%s", view)
 	}
 }
+
+func TestEmptyDrawSlotShowsCursor(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.ANSI256)
+	defer lipgloss.SetColorProfile(prev)
+	m := testModel(t)
+	m.cursor = cursor{region: regionWaste}
+	if len(m.game.WasteVisible()) != 0 {
+		t.Fatal("fresh deal must start with an empty draw pile")
+	}
+	if !strings.Contains(m.topView(), "\x1b[7m") {
+		t.Fatalf("cursor on empty draw slot must render reverse video:\n%q", m.topView())
+	}
+}
