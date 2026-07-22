@@ -636,7 +636,9 @@ func modelWithTopTableauAce(t *testing.T, suit engine.Suit) Model {
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("tableau"), [7][]engine.TableauCard{
 		{{Card: engine.Card{Rank: engine.Ace, Suit: suit}, FaceUp: true}},
 	})
-	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
+	// A drawable ace keeps the position live after the tested move, so
+	// dead-end detection never fires inside these fixtures.
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card{{Rank: engine.Ace, Suit: engine.Diamonds}})
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
 	m.game = g
 	return m
@@ -652,7 +654,8 @@ func modelWithMovableKingAndTwoEmptyColumns(t *testing.T) Model {
 		nil,
 		nil,
 	})
-	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
+	// Drawable ace: see modelWithTopTableauAce.
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card{{Rank: engine.Ace, Suit: engine.Diamonds}})
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
 	m.game = g
 	return m
@@ -674,7 +677,8 @@ func modelWithMovableFourAndNonEmptyTableauDestinations(t *testing.T) Model {
 			{Card: engine.Card{Rank: engine.Five, Suit: engine.Diamonds}, FaceUp: true},
 		},
 	})
-	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card(nil))
+	// Drawable ace: see modelWithTopTableauAce.
+	setUnexported(reflect.ValueOf(g).Elem().FieldByName("stock"), []engine.Card{{Rank: engine.Ace, Suit: engine.Diamonds}})
 	setUnexported(reflect.ValueOf(g).Elem().FieldByName("waste"), []engine.Card(nil))
 	m.game = g
 	return m
@@ -894,5 +898,92 @@ func TestSelectedDestinationsSortedByPriority(t *testing.T) {
 	}
 	if len(sorted) != 3 || len(moves) != 3 {
 		t.Fatal("sort must not add or drop moves")
+	}
+}
+
+// forceDeadEnd rewrites the model's game into a two-queen position with no
+// deck, draw pile, kings, or aces: no legal moves at all.
+func forceDeadEnd(t *testing.T, m Model) Model {
+	t.Helper()
+	rv := reflect.ValueOf(m.game).Elem()
+	setUnexported(rv.FieldByName("stock"), []engine.Card(nil))
+	setUnexported(rv.FieldByName("waste"), []engine.Card(nil))
+	var tableau [7][]engine.TableauCard
+	tableau[0] = []engine.TableauCard{{Card: engine.Card{Suit: engine.Spades, Rank: engine.Queen}, FaceUp: true}}
+	tableau[1] = []engine.TableauCard{{Card: engine.Card{Suit: engine.Hearts, Rank: engine.Queen}, FaceUp: true}}
+	setUnexported(rv.FieldByName("tableau"), tableau)
+	if !m.game.DeadEnd() {
+		t.Fatal("constructed position must be a dead end")
+	}
+	return m
+}
+
+func TestDeadEndShowsGameOverScreen(t *testing.T) {
+	m := forceDeadEnd(t, testModel(t))
+	m, _ = m.Update(key("d")) // any action recomputes dead-end state
+	if !m.gameOver {
+		t.Fatal("gameOver must be set after action on dead board")
+	}
+	if m.running {
+		t.Fatal("timer must stop on game over")
+	}
+	v := m.View()
+	for _, want := range []string{"G A M E   O V E R", "no moves left", "n new game", "u undo"} {
+		if !strings.Contains(v, want) {
+			t.Fatalf("game-over view missing %q:\n%s", want, v)
+		}
+	}
+	if strings.Contains(v, "Tableau") {
+		t.Fatalf("board must be hidden on game over:\n%s", v)
+	}
+}
+
+func TestGameOverGatesKeys(t *testing.T) {
+	m := forceDeadEnd(t, testModel(t))
+	m, _ = m.Update(key("d"))
+	before := m.cursor
+	m, _ = m.Update(key("1"))
+	m, _ = m.Update(key("j"))
+	if m.cursor != before {
+		t.Fatal("cursor keys must be inert on game over")
+	}
+	_, cmd := m.Update(key("m"))
+	if cmd == nil {
+		t.Fatal("m must still return to launcher")
+	}
+	if _, ok := cmd().(BackMsg); !ok {
+		t.Fatal("m must produce BackMsg")
+	}
+}
+
+func TestGameOverUndoReturnsToBoard(t *testing.T) {
+	m := testModel(t)
+	m.undoStack = append(m.undoStack, m.game.Clone()) // live position to restore
+	m = forceDeadEnd(t, m)
+	m, _ = m.Update(key("d"))
+	if !m.gameOver {
+		t.Fatal("expected game over")
+	}
+	m, _ = m.Update(key("u"))
+	if m.gameOver {
+		t.Fatal("undo into a live position must clear gameOver")
+	}
+	if !m.assisted {
+		t.Fatal("undo must still mark the run assisted")
+	}
+	if !strings.Contains(m.View(), "Tableau") {
+		t.Fatal("board must render again after undo")
+	}
+}
+
+func TestGameOverNewDealResets(t *testing.T) {
+	m := forceDeadEnd(t, testModel(t))
+	m, _ = m.Update(key("d"))
+	m, _ = m.Update(key("n"))
+	if m.gameOver {
+		t.Fatal("new deal must clear gameOver")
+	}
+	if m.game.Moves() != 0 {
+		t.Fatalf("new deal must reset moves, got %d", m.game.Moves())
 	}
 }

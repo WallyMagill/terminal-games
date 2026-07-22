@@ -45,6 +45,7 @@ type Model struct {
 	newBestMoves      bool
 	saveErr           bool
 	recordedWin       bool
+	gameOver          bool
 	bestSeconds       *int
 	fewestMoves       *int
 	undoStack         []*engine.Game
@@ -137,6 +138,21 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(k string) (Model, tea.Cmd) {
+	if m.gameOver {
+		switch k {
+		case "n":
+			return m.newDeal()
+		case "u":
+			return m.undo()
+		case "m", "esc":
+			return m, back()
+		case "q":
+			return m, tea.Quit
+		case "?":
+			m.showHelp = true
+		}
+		return m, nil
+	}
 	switch k {
 	case "?":
 		m.showHelp = true
@@ -175,15 +191,7 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 	case "q":
 		return m, tea.Quit
 	case "n":
-		fresh, err := NewModel(m.scores, m.rng)
-		if err != nil {
-			m.message = "Could not deal a new game"
-			return m, nil
-		}
-		fresh.tickGen = m.tickGen + 1
-		fresh.termW = m.termW
-		fresh.termH = m.termH
-		return fresh, nil
+		return m.newDeal()
 	case "left", "h":
 		m.moveCursorLeft()
 	case "w":
@@ -226,7 +234,28 @@ func (m Model) draw() (Model, tea.Cmd) {
 		m.message = "No cards to draw"
 	}
 	m.recordWinIfNeeded()
+	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(changed)
+}
+
+func (m Model) newDeal() (Model, tea.Cmd) {
+	fresh, err := NewModel(m.scores, m.rng)
+	if err != nil {
+		m.message = "Could not deal a new game"
+		return m, nil
+	}
+	fresh.tickGen = m.tickGen + 1
+	fresh.termW = m.termW
+	fresh.termH = m.termH
+	return fresh, nil
+}
+
+func (m Model) checkDeadEnd() Model {
+	m.gameOver = m.game.Status() == engine.Playing && m.game.DeadEnd()
+	if m.gameOver {
+		m.running = false
+	}
+	return m
 }
 
 const noProgressMessage = "No progress this pass — move a card before recycling again"
@@ -265,6 +294,7 @@ func (m Model) activate() (Model, tea.Cmd) {
 				m.message = "Invalid move"
 			}
 			m.recordWinIfNeeded()
+			m = m.checkDeadEnd()
 			return m.startTimerIfNeeded(changed)
 		default:
 			m.selected = &loc
@@ -291,6 +321,7 @@ func (m Model) activate() (Model, tea.Cmd) {
 		m.message = "Invalid move"
 	}
 	m.recordWinIfNeeded()
+	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(changed)
 }
 
@@ -330,6 +361,7 @@ func (m Model) autoFoundation() (Model, tea.Cmd) {
 		m.message = "No safe foundation move"
 	}
 	m.recordWinIfNeeded()
+	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(changed)
 }
 
@@ -364,6 +396,7 @@ func (m Model) autoFoundationAll() (Model, tea.Cmd) {
 	m = m.noteCardProgress()
 	m.message = "Moved safe cards to foundation"
 	m.recordWinIfNeeded()
+	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(true)
 }
 
@@ -383,11 +416,12 @@ func (m Model) undo() (Model, tea.Cmd) {
 	m.newBestMoves = false
 	m.saveErr = false
 	m.message = "Undid move"
+	m = m.checkDeadEnd()
 	return m.startTimerIfNeeded(true)
 }
 
 func (m Model) startTimerIfNeeded(changed bool) (Model, tea.Cmd) {
-	if !changed || m.running || m.game.Status() != engine.Playing {
+	if !changed || m.running || m.gameOver || m.game.Status() != engine.Playing {
 		return m, nil
 	}
 	m.running = true
@@ -544,6 +578,9 @@ func (m Model) View() string {
 	if m.showHelp {
 		return m.helpView()
 	}
+	if m.gameOver {
+		return m.gameOverView()
+	}
 	var b strings.Builder
 	record := m.recordSummary()
 	b.WriteString(styleTitle.Render(fitLine(m.termW,
@@ -556,6 +593,21 @@ func (m Model) View() string {
 	b.WriteString(m.tableauView())
 	b.WriteString("\n\n")
 	b.WriteString(m.statusLine())
+	return b.String()
+}
+
+func (m Model) gameOverView() string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render(" SOLITAIRE DRAW 3") + "\n\n")
+	b.WriteString(styleErr.Render("      G A M E   O V E R") + "\n")
+	b.WriteString(styleFaint.Render("      no moves left") + "\n\n")
+	b.WriteString(fmt.Sprintf("      time   %4ds\n", m.elapsed))
+	b.WriteString(fmt.Sprintf("      moves  %5d\n", m.game.Moves()))
+	b.WriteString(styleFaint.Render("      "+m.recordSummary()) + "\n\n")
+	b.WriteString(styleFaint.Render(fitLine(m.termW,
+		" n new game · u undo · m menu · q quit",
+		" n new · u undo · m menu",
+	)) + "\n")
 	return b.String()
 }
 
