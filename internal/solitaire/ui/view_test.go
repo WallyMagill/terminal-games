@@ -22,22 +22,33 @@ func TestViewRendersCoreRegions(t *testing.T) {
 	}
 }
 
-func TestTopViewShowsSingleDrawCard(t *testing.T) {
+func TestTopViewShowsThreeDrawCards(t *testing.T) {
 	m := testModel(t)
-	m, _ = m.Update(key("d")) // draw 3: only the top card may render
+	m, _ = m.Update(key("d"))
 	visible := m.game.WasteVisible()
 	if len(visible) != 3 {
 		t.Fatalf("expected 3 drawn cards, got %d", len(visible))
 	}
 	top := m.topView()
-	for i, card := range visible {
-		token := cardToken(card)
-		if i == len(visible)-1 {
-			if !strings.Contains(top, token) {
-				t.Fatalf("top card %s missing from view:\n%s", token, top)
-			}
-		} else if strings.Contains(top, token) {
-			t.Fatalf("under-card %s must not render:\n%s", token, top)
+	for _, card := range visible {
+		if !strings.Contains(top, cardToken(card)) {
+			t.Fatalf("card %s missing from fan:\n%s", cardToken(card), top)
+		}
+	}
+}
+
+func TestTopViewFanShowsRemainingCardsAfterTopPlayed(t *testing.T) {
+	m := testModel(t)
+	rv := reflect.ValueOf(m.game).Elem()
+	remaining := []engine.Card{
+		{Suit: engine.Clubs, Rank: engine.Four},
+		{Suit: engine.Diamonds, Rank: engine.Seven},
+	}
+	setUnexported(rv.FieldByName("waste"), remaining)
+	top := m.topView()
+	for _, card := range remaining {
+		if !strings.Contains(top, cardToken(card)) {
+			t.Fatalf("under-card %s must be visible after the top is played:\n%s", cardToken(card), top)
 		}
 	}
 }

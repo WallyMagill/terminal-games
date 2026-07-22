@@ -694,20 +694,31 @@ func (m Model) tooSmallView() string {
 
 func (m Model) topView() string {
 	var b strings.Builder
-	b.WriteString(" Deck   Draw    Foundations\n ")
+	b.WriteString(" Deck   Draw              Foundations\n ")
 	stock := emptyToken(" · ")
 	if m.game.StockCount() > 0 {
 		stock = hiddenToken()
 	}
 	b.WriteString(m.decorate(regionStock, 0, 0, stock))
-	b.WriteString("  ")
+	b.WriteString(" ")
 	waste := m.game.WasteVisible()
-	draw := emptyToken("")
-	if len(waste) > 0 {
-		draw = styledCard(waste[len(waste)-1])
+	for i := range 3 - len(waste) {
+		b.WriteString(emptyToken(""))
+		if i < 2 || len(waste) > 0 {
+			b.WriteString(" ")
+		}
 	}
-	b.WriteString(m.decorate(regionWaste, 0, 0, draw))
-	b.WriteString("   ")
+	for i, card := range waste {
+		token := styledCard(card)
+		if i == len(waste)-1 {
+			token = m.decorate(regionWaste, 0, 0, token)
+		}
+		b.WriteString(token)
+		if i < len(waste)-1 {
+			b.WriteString(" ")
+		}
+	}
+	b.WriteString(" ")
 	for suit := engine.Spades; suit <= engine.Clubs; suit++ {
 		token := emptyToken("")
 		if card, ok := m.game.FoundationTop(suit); ok {
