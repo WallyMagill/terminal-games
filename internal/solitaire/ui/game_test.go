@@ -428,19 +428,14 @@ func TestSafeAutoFoundationMovesAllSafeCardsWithoutAssistedFlag(t *testing.T) {
 	}
 }
 
-func TestHintMarksAssistedAndDoesNotMutateGame(t *testing.T) {
+func TestHintKeyRemoved(t *testing.T) {
 	m := testModel(t)
-	beforeMoves := m.game.Moves()
-	beforeStock := m.game.StockCount()
 	m, _ = m.Update(key("h"))
-	if !m.assisted {
-		t.Fatal("hint should mark game assisted")
+	if strings.Contains(m.message, "Hint") {
+		t.Fatalf("h must no longer produce hints, got %q", m.message)
 	}
-	if m.game.Moves() != beforeMoves || m.game.StockCount() != beforeStock {
-		t.Fatalf("hint should not mutate game, moves %d->%d stock %d->%d", beforeMoves, m.game.Moves(), beforeStock, m.game.StockCount())
-	}
-	if !strings.Contains(m.message, "Hint:") {
-		t.Fatalf("hint should set explanatory message, got %q", m.message)
+	if m.assisted {
+		t.Fatal("h must no longer mark the game assisted")
 	}
 }
 

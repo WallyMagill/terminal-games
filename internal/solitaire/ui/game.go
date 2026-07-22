@@ -148,8 +148,6 @@ func (m Model) handleKey(k string) (Model, tea.Cmd) {
 		return m.autoFoundation()
 	case "A":
 		return m.autoFoundationAll()
-	case "h":
-		return m.hint(), nil
 	case "u":
 		return m.undo()
 	case "tab":
@@ -725,8 +723,7 @@ func (m Model) helpView() string {
 		" arrows/jkl   move",
 		" spc/enter    select card or move selection",
 		" d            draw 3 / recycle stock",
-		" h            hint",
-		" u            undo last move (assisted)",
+			" u            undo last move (assisted)",
 		" a            move focused/selected safe card to foundation",
 		" A            auto-foundation all safe cards",
 		" esc          cancel selection / menu",

@@ -81,7 +81,7 @@ func TestHelpViewRendersControls(t *testing.T) {
 	m := testModel(t)
 	m.showHelp = true
 	v := m.View()
-	for _, want := range []string{"Solitaire Draw 3", "d            draw 3", "h            hint", "a            move focused/selected", "A            auto-foundation all", "spc/enter"} {
+	for _, want := range []string{"Solitaire Draw 3", "d            draw 3", "a            move focused/selected", "A            auto-foundation all", "spc/enter"} {
 		if !strings.Contains(v, want) {
 			t.Fatalf("help missing %q:\n%s", want, v)
 		}
