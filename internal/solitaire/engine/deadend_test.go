@@ -87,11 +87,10 @@ func TestDeadEndFalseWhenCardBuriedInDeck(t *testing.T) {
 	}
 }
 
-func TestDeadEndFalseWhenCardSurfacesOnlyAfterPermutedRecycle(t *testing.T) {
-	// 7 cards: stock+waste ≢ 0 mod 3, so this engine's reverse-chunk recycle
-	// permutes the deck each cycle. The ace at index 4 is never a waste top
-	// in cycle 1; it surfaces only after a recycle reorders the deck.
-	// Length-based cycle detection would wrongly report a dead end here.
+func TestDeadEndTrueWhenBuriedCardNeverSurfaces(t *testing.T) {
+	// Classic recycle makes pass tops FIXED during a draw-only walk: the ace
+	// sits at a non-top position, never surfaces, and the position is a dead
+	// end even though the ace exists in the deck.
 	g := &Game{status: Playing}
 	g.tableau[0] = []TableauCard{{Card: Card{Suit: Hearts, Rank: Five}, FaceUp: true}}
 	g.stock = []Card{
@@ -103,8 +102,26 @@ func TestDeadEndFalseWhenCardSurfacesOnlyAfterPermutedRecycle(t *testing.T) {
 		{Suit: Diamonds, Rank: Nine},
 		{Suit: Clubs, Rank: Queen},
 	}
+	if !g.DeadEnd() {
+		t.Fatal("buried ace unreachable by draws alone must be a dead end under classic recycle")
+	}
+}
+
+func TestDeadEndFalseWhenCardSurfacesMidPass(t *testing.T) {
+	// Ace at a top position of a later draw group: surfaces on the second
+	// draw of the pass, so the position is not dead.
+	g := &Game{status: Playing}
+	g.tableau[0] = []TableauCard{{Card: Card{Suit: Hearts, Rank: Five}, FaceUp: true}}
+	g.stock = []Card{
+		{Suit: Clubs, Rank: Ten},
+		{Suit: Diamonds, Rank: Ten},
+		{Suit: Clubs, Rank: Ace},
+		{Suit: Hearts, Rank: Ten},
+		{Suit: Spades, Rank: Ten},
+		{Suit: Clubs, Rank: Queen},
+	}
 	if g.DeadEnd() {
-		t.Fatal("ace reachable only via permuted recycle must not be a dead end")
+		t.Fatal("ace that tops the second draw group must not be a dead end")
 	}
 }
 

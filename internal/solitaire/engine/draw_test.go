@@ -79,6 +79,40 @@ func TestRecyclePreservesDrawThreeOrderAcrossPasses(t *testing.T) {
 	}
 }
 
+func TestRecycleReplaysMisalignedPass(t *testing.T) {
+	// A 7-card waste drawn as groups [a,b,c],[d,e,f],[g] has pass tops c, f, g.
+	// After a classic flip recycle, redrawing must expose the same tops in the
+	// same order — and again on every subsequent pass.
+	g := &Game{status: Playing}
+	g.waste = []Card{
+		{Suit: Clubs, Rank: Two}, {Suit: Diamonds, Rank: Two}, {Suit: Hearts, Rank: Two},
+		{Suit: Spades, Rank: Two}, {Suit: Clubs, Rank: Three}, {Suit: Diamonds, Rank: Three},
+		{Suit: Hearts, Rank: Three},
+	}
+	wantTops := []Card{
+		{Suit: Hearts, Rank: Two},     // top of group [a,b,c]
+		{Suit: Diamonds, Rank: Three}, // top of group [d,e,f]
+		{Suit: Hearts, Rank: Three},   // the remainder card g
+	}
+	for pass := 1; pass <= 2; pass++ {
+		if !g.Draw() { // recycle
+			t.Fatalf("pass %d: recycle should succeed", pass)
+		}
+		if g.StockCount() != 7 || len(g.waste) != 0 {
+			t.Fatalf("pass %d: after recycle stock %d waste %d, want 7/0", pass, g.StockCount(), len(g.waste))
+		}
+		for i, want := range wantTops {
+			if !g.Draw() {
+				t.Fatalf("pass %d draw %d failed", pass, i+1)
+			}
+			visible := g.WasteVisible()
+			if got := visible[len(visible)-1]; got != want {
+				t.Fatalf("pass %d diverges at draw %d: top %v, want %v", pass, i+1, got, want)
+			}
+		}
+	}
+}
+
 func sameCards(a, b []Card) bool {
 	if len(a) != len(b) {
 		return false

@@ -53,13 +53,17 @@ func (g *Game) Draw() bool {
 		if len(g.waste) == 0 {
 			return false
 		}
-		for end := len(g.waste); end > 0; {
-			start := end - 3
-			if start < 0 {
-				start = 0
+		// Classic flip: rebuild the stock so every pass re-deals the same
+		// triples with the same tops. Walk the waste bottom-up in chunks of 3
+		// (the original draw groups) and stack the chunks in reverse order —
+		// the first-drawn group ends up back on top.
+		n := len(g.waste)
+		for start := ((n - 1) / 3) * 3; start >= 0; start -= 3 {
+			end := start + 3
+			if end > n {
+				end = n
 			}
 			g.stock = append(g.stock, g.waste[start:end]...)
-			end = start
 		}
 		g.waste = nil
 		g.moves++

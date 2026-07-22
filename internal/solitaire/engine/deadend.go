@@ -26,12 +26,9 @@ func (g *Game) ProductiveMoves() []Move {
 
 // DeadEnd reports whether no productive move is reachable: none now, and none
 // for any draw-pile top reachable by drawing/recycling, simulated on a clone.
-// Drawing without moving cards is deterministic, but this engine's recycle
-// rebuilds the deck in reverse 3-chunks, which PERMUTES card order whenever
-// the drained count is not a multiple of 3 — later cycles can surface
-// different tops. Termination therefore tracks exact (deck, draw) state
-// identity, not pile lengths: the walk stops when a state repeats. The state
-// space is finite (~thousands at worst); the cap is a pure safety net.
+// Recycle preserves pass order (classic flip), so one cycle visits every
+// reachable top; the state-identity termination below is kept as redundant
+// defense — it stays exact even if draw mechanics ever change again.
 func (g *Game) DeadEnd() bool {
 	if g.status != Playing {
 		return false
