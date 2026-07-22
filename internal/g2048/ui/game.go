@@ -173,6 +173,9 @@ func (m Model) View() string {
 	if m.showHelp {
 		return m.helpView()
 	}
+	if m.game.Over() {
+		return m.gameOverView()
+	}
 	var b strings.Builder
 	b.WriteString(styleTitle.Render(" 2048") + "\n")
 	bestLabel := fmt.Sprintf("BEST %d", m.bestScore)
@@ -197,6 +200,42 @@ func (m Model) View() string {
 	b.WriteString(styleFaint.Render(fitLine(m.termW,
 		" ←↑↓→ / hjkl move · n new · m menu · ? help · q quit",
 		" arrows move · n new · m menu",
+	)) + "\n")
+	return b.String()
+}
+
+func (m Model) gameOverView() string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render(" 2048") + "\n")
+	bestLabel := fmt.Sprintf("BEST %d", m.bestScore)
+	if m.newBestScore {
+		bestLabel = styleBest.Render(bestLabel)
+	} else {
+		bestLabel = styleFaint.Render(bestLabel)
+	}
+	b.WriteString(fmt.Sprintf(" SCORE %-6d  %s", m.game.Score(), bestLabel) + "\n\n")
+
+	b.WriteString(styleErr.Render("      G A M E   O V E R") + "\n\n")
+
+	star := "  " + styleBest.Render("★ new best")
+	scoreLine := fmt.Sprintf("      score  %6d", m.game.Score())
+	if m.newBestScore {
+		scoreLine += star
+	}
+	tileLine := fmt.Sprintf("      tile   %6d", m.game.HighestTile())
+	if m.newBestTile {
+		tileLine += star
+	}
+	b.WriteString(scoreLine + "\n")
+	b.WriteString(tileLine + "\n")
+	b.WriteString(fmt.Sprintf("      best   %6d", m.bestScore) + "\n\n")
+
+	if m.saveErr {
+		b.WriteString(styleErr.Render(" could not save record") + "\n")
+	}
+	b.WriteString(styleFaint.Render(fitLine(m.termW,
+		" n new game · m menu · q quit",
+		" n new · m menu",
 	)) + "\n")
 	return b.String()
 }
