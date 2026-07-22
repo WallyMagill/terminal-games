@@ -193,13 +193,13 @@ func describeCard(card engine.Card) string {
 func describeLocation(loc engine.Location) string {
 	switch loc.Kind {
 	case engine.Waste:
-		return "waste"
+		return "draw pile"
 	case engine.Foundation:
 		return fmt.Sprintf("%s foundation", suitName(engine.Suit(loc.Pile)))
 	case engine.Tableau:
 		return fmt.Sprintf("tableau %d", loc.Pile+1)
 	default:
-		return "stock"
+		return "deck"
 	}
 }
 

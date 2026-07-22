@@ -219,7 +219,7 @@ func (m Model) draw() (Model, tea.Cmd) {
 	return m.startTimerIfNeeded(changed)
 }
 
-const noProgressMessage = "No progress this stock pass — move a card before cycling again"
+const noProgressMessage = "No progress this pass — move a card before recycling again"
 
 func (m Model) noteCardProgress() Model {
 	m.stockPassProgress = true
@@ -602,31 +602,20 @@ func (m Model) tooSmallView() string {
 
 func (m Model) topView() string {
 	var b strings.Builder
-	b.WriteString(" Stock        Waste             Foundations\n ")
+	b.WriteString(" Deck   Draw    Foundations\n ")
 	stock := emptyToken(" · ")
 	if m.game.StockCount() > 0 {
 		stock = hiddenToken()
 	}
 	b.WriteString(m.decorate(regionStock, 0, 0, stock))
-	b.WriteString(" ")
+	b.WriteString("  ")
 	waste := m.game.WasteVisible()
-	for i := range 3 - len(waste) {
-		b.WriteString(emptyToken(""))
-		if i < 2 || len(waste) > 0 {
-			b.WriteString(" ")
-		}
+	draw := emptyToken("")
+	if len(waste) > 0 {
+		draw = styledCard(waste[len(waste)-1])
 	}
-	for i, card := range waste {
-		token := styledCard(card)
-		if i == len(waste)-1 {
-			token = m.decorate(regionWaste, 0, 0, token)
-		}
-		b.WriteString(token)
-		if i < len(waste)-1 {
-			b.WriteString(" ")
-		}
-	}
-	b.WriteString(" ")
+	b.WriteString(m.decorate(regionWaste, 0, 0, draw))
+	b.WriteString("   ")
 	for suit := engine.Spades; suit <= engine.Clubs; suit++ {
 		token := emptyToken("")
 		if card, ok := m.game.FoundationTop(suit); ok {
@@ -722,8 +711,8 @@ func (m Model) helpView() string {
 		"",
 		" arrows/jkl   move",
 		" spc/enter    select card or move selection",
-		" d            draw 3 / recycle stock",
-			" u            undo last move (assisted)",
+		" d            draw 3 / recycle deck",
+		" u            undo last move (assisted)",
 		" a            move focused/selected safe card to foundation",
 		" A            auto-foundation all safe cards",
 		" esc          cancel selection / menu",

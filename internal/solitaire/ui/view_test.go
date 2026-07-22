@@ -15,10 +15,41 @@ import (
 func TestViewRendersCoreRegions(t *testing.T) {
 	m := testModel(t)
 	v := m.View()
-	for _, want := range []string{"SOLITAIRE DRAW 3", "Stock", "Waste", "Foundations", "Tableau"} {
+	for _, want := range []string{"SOLITAIRE DRAW 3", "Deck", "Draw", "Foundations", "Tableau"} {
 		if !strings.Contains(v, want) {
 			t.Fatalf("view missing %q:\n%s", want, v)
 		}
+	}
+}
+
+func TestTopViewShowsSingleDrawCard(t *testing.T) {
+	m := testModel(t)
+	m, _ = m.Update(key("d")) // draw 3: only the top card may render
+	visible := m.game.WasteVisible()
+	if len(visible) != 3 {
+		t.Fatalf("expected 3 drawn cards, got %d", len(visible))
+	}
+	top := m.topView()
+	for i, card := range visible {
+		token := cardToken(card)
+		if i == len(visible)-1 {
+			if !strings.Contains(top, token) {
+				t.Fatalf("top card %s missing from view:\n%s", token, top)
+			}
+		} else if strings.Contains(top, token) {
+			t.Fatalf("under-card %s must not render:\n%s", token, top)
+		}
+	}
+}
+
+func TestNoWasteWordingRemains(t *testing.T) {
+	m := testModel(t)
+	m.cursor = cursor{region: regionWaste}
+	if got := describeLocation(m.cursor.location()); got != "draw pile" {
+		t.Fatalf("describeLocation(waste) = %q, want \"draw pile\"", got)
+	}
+	if got := describeLocation(cursor{region: regionStock}.location()); got != "deck" {
+		t.Fatalf("describeLocation(stock) = %q, want \"deck\"", got)
 	}
 }
 
