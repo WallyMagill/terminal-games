@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 // fitLine keeps the full variant when it fits exactly: the swap is for lines

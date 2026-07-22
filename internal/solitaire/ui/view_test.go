@@ -8,8 +8,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
-	"github.com/wallymagill/mines/internal/solitaire/engine"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/solitaire/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 func TestViewRendersCoreRegions(t *testing.T) {

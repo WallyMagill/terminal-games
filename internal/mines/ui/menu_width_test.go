@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 func checkLinesFit(t *testing.T, ctx, view string, termW int) {

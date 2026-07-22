@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/wallymagill/mines/internal/mines/engine"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/mines/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 func TestViewGoldenInitialBoard(t *testing.T) {

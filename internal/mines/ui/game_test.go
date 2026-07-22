@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/mines/engine"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/mines/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 var testPreset = Preset{Name: "Test", Key: "", Width: 4, Height: 4, Mines: 2}

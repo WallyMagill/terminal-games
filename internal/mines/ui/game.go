@@ -8,8 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/wallymagill/mines/internal/mines/engine"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/mines/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 type tickMsg struct{ gen int }

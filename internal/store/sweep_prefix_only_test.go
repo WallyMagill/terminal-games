@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 // The sweep must require BOTH halves of the temp naming scheme: the

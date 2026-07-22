@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/mines/engine"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/mines/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 // startGameMsg is emitted by the menu and consumed by the root model.

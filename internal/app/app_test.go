@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	g2048ui "github.com/wallymagill/mines/internal/g2048/ui"
-	solitaireui "github.com/wallymagill/mines/internal/solitaire/ui"
-	"github.com/wallymagill/mines/internal/store"
+	g2048ui "github.com/wallymagill/terminal-games/internal/g2048/ui"
+	solitaireui "github.com/wallymagill/terminal-games/internal/solitaire/ui"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 func testApp(t *testing.T) App {

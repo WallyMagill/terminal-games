@@ -2,7 +2,7 @@ package ui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/uiutil"
+	"github.com/wallymagill/terminal-games/internal/uiutil"
 )
 
 func typedKeys(msg tea.KeyMsg) []string { return uiutil.TypedKeys(msg) }

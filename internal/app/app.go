@@ -5,11 +5,11 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	g2048ui "github.com/wallymagill/mines/internal/g2048/ui"
-	minesui "github.com/wallymagill/mines/internal/mines/ui"
-	solitaireui "github.com/wallymagill/mines/internal/solitaire/ui"
-	"github.com/wallymagill/mines/internal/store"
-	"github.com/wallymagill/mines/internal/uiutil"
+	g2048ui "github.com/wallymagill/terminal-games/internal/g2048/ui"
+	minesui "github.com/wallymagill/terminal-games/internal/mines/ui"
+	solitaireui "github.com/wallymagill/terminal-games/internal/solitaire/ui"
+	"github.com/wallymagill/terminal-games/internal/store"
+	"github.com/wallymagill/terminal-games/internal/uiutil"
 )
 
 type view int

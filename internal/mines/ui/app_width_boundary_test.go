@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 // TestAppWidthBoundaryCoversRightEdgeCursor pins the +1 bracket column in

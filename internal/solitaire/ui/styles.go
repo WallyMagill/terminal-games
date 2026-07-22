@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/wallymagill/mines/internal/solitaire/engine"
-	"github.com/wallymagill/mines/internal/uiutil"
+	"github.com/wallymagill/terminal-games/internal/solitaire/engine"
+	"github.com/wallymagill/terminal-games/internal/uiutil"
 )
 
 const (

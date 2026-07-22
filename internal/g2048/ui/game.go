@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/g2048/engine"
-	"github.com/wallymagill/mines/internal/store"
-	"github.com/wallymagill/mines/internal/uiutil"
+	"github.com/wallymagill/terminal-games/internal/g2048/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
+	"github.com/wallymagill/terminal-games/internal/uiutil"
 )
 
 type BackMsg struct{}

@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/uiutil"
+	"github.com/wallymagill/terminal-games/internal/uiutil"
 )
 
 type launcherItem int

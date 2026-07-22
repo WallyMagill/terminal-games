@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 func testModel(t *testing.T) Model {

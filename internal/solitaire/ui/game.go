@@ -8,9 +8,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/solitaire/engine"
-	"github.com/wallymagill/mines/internal/store"
-	"github.com/wallymagill/mines/internal/uiutil"
+	"github.com/wallymagill/terminal-games/internal/solitaire/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
+	"github.com/wallymagill/terminal-games/internal/uiutil"
 )
 
 type BackMsg struct{}

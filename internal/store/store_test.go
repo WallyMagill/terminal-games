@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 func tempStore(t *testing.T) (*store.Store, string) {

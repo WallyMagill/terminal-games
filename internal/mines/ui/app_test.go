@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/mines/engine"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/mines/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 // winTiny drives a 2×2/1 game under presetKey to a win, routing every

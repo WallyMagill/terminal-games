@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/wallymagill/mines/internal/solitaire/engine"
+import "github.com/wallymagill/terminal-games/internal/solitaire/engine"
 
 type region uint8
 

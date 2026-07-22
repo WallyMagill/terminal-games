@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/wallymagill/mines/internal/solitaire/engine"
+	"github.com/wallymagill/terminal-games/internal/solitaire/engine"
 )
 
 func (m Model) playableSources() []engine.Location {

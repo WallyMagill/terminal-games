@@ -8,8 +8,8 @@ import (
 	"unsafe"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/wallymagill/mines/internal/solitaire/engine"
-	"github.com/wallymagill/mines/internal/store"
+	"github.com/wallymagill/terminal-games/internal/solitaire/engine"
+	"github.com/wallymagill/terminal-games/internal/store"
 )
 
 func key(s string) tea.KeyMsg {
