@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	g2048ui "github.com/wallymagill/mines/internal/g2048/ui"
 	minesui "github.com/wallymagill/mines/internal/mines/ui"
 	solitaireui "github.com/wallymagill/mines/internal/solitaire/ui"
 	"github.com/wallymagill/mines/internal/store"
@@ -17,6 +18,7 @@ const (
 	viewLauncher view = iota
 	viewMines
 	viewSolitaire
+	view2048
 )
 
 type App struct {
@@ -24,6 +26,7 @@ type App struct {
 	launcher  launcherModel
 	mines     tea.Model
 	solitaire solitaireui.Model
+	g2048     g2048ui.Model
 	scores    *store.Store
 	termW     int
 	termH     int
@@ -58,6 +61,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.solitaire = model
 			return a, cmd
 		}
+		if a.view == view2048 {
+			model, cmd := a.g2048.Update(msg)
+			a.g2048 = model
+			return a, cmd
+		}
 		return a, nil
 	case launcherSelectMsg:
 		switch msg.item {
@@ -80,6 +88,17 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.view = viewSolitaire
 			}
 			return a, nil
+		case launcher2048:
+			g2048, err := g2048ui.NewModel(a.scores, legacyrand.New(legacyrand.NewSource(time.Now().UnixNano())))
+			if err == nil {
+				if a.termW > 0 || a.termH > 0 {
+					model, _ := g2048.Update(tea.WindowSizeMsg{Width: a.termW, Height: a.termH})
+					g2048 = model
+				}
+				a.g2048 = g2048
+				a.view = view2048
+			}
+			return a, nil
 		case launcherQuit:
 			return a, tea.Quit
 		}
@@ -87,6 +106,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.view = viewLauncher
 		return a, nil
 	case solitaireui.BackMsg:
+		a.view = viewLauncher
+		return a, nil
+	case g2048ui.BackMsg:
 		a.view = viewLauncher
 		return a, nil
 	case tea.KeyMsg:
@@ -114,6 +136,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		model, cmd := a.solitaire.Update(msg)
 		a.solitaire = model
 		return a, cmd
+	case view2048:
+		model, cmd := a.g2048.Update(msg)
+		a.g2048 = model
+		return a, cmd
 	default:
 		return a, nil
 	}
@@ -128,6 +154,12 @@ func (a App) View() string {
 	case viewSolitaire:
 		view := a.solitaire.View()
 		if a.solitaire.TooSmall() {
+			return view
+		}
+		return "\n" + view + "\n"
+	case view2048:
+		view := a.g2048.View()
+		if a.g2048.TooSmall() {
 			return view
 		}
 		return "\n" + view + "\n"

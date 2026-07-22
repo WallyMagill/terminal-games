@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	g2048ui "github.com/wallymagill/mines/internal/g2048/ui"
 	solitaireui "github.com/wallymagill/mines/internal/solitaire/ui"
 	"github.com/wallymagill/mines/internal/store"
 )
@@ -34,8 +35,80 @@ func key(s string) tea.KeyMsg {
 func TestStartsOnLauncher(t *testing.T) {
 	a := testApp(t)
 	v := a.View()
-	if !strings.Contains(v, "TERMINAL GAMES") || !strings.Contains(v, "Minesweeper") || !strings.Contains(v, "Solitaire") {
+	if !strings.Contains(v, "TERMINAL GAMES") || !strings.Contains(v, "Minesweeper") || !strings.Contains(v, "Solitaire") || !strings.Contains(v, "2048") {
 		t.Fatalf("launcher missing expected labels:\n%s", v)
+	}
+}
+
+func TestLauncherSelects2048(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(key("down"))
+	a = model.(App)
+	model, _ = a.Update(key("down"))
+	a = model.(App)
+	model, _ = a.Update(key("enter"))
+	a = model.(App)
+	if a.view != view2048 {
+		t.Fatalf("view = %v, want view2048", a.view)
+	}
+	v := a.View()
+	if !strings.Contains(v, "2048") || !strings.Contains(v, "SCORE") {
+		t.Fatalf("2048 view missing pieces:\n%s", v)
+	}
+}
+
+func Test2048EscReturnsToLauncher(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(launcherSelectMsg{item: launcher2048})
+	a = model.(App)
+	if a.view != view2048 {
+		t.Fatalf("view = %v, want view2048", a.view)
+	}
+	_, cmd := a.Update(key("esc"))
+	if cmd == nil {
+		t.Fatal("esc in 2048 should request launcher back")
+	}
+	if _, ok := cmd().(g2048ui.BackMsg); !ok {
+		t.Fatal("esc in 2048 should produce g2048 BackMsg")
+	}
+	model, _ = a.Update(g2048ui.BackMsg{})
+	a = model.(App)
+	if a.view != viewLauncher {
+		t.Fatalf("view = %v, want viewLauncher", a.view)
+	}
+	if !strings.Contains(a.View(), "TERMINAL GAMES") {
+		t.Fatalf("launcher did not render after 2048 back:\n%s", a.View())
+	}
+}
+
+func TestLauncherShows2048TooSmall(t *testing.T) {
+	a := New(store.New(t.TempDir() + "/scores.json"))
+	model, _ := a.Update(tea.WindowSizeMsg{Width: 20, Height: 8})
+	a = model.(App)
+	model, _ = a.Update(launcherSelectMsg{item: launcher2048})
+	a = model.(App)
+	v := a.View()
+	if !strings.Contains(v, "too small") {
+		t.Fatalf("2048 should show too-small view at 20x8:\n%s", v)
+	}
+}
+
+func TestReentered2048StartsFreshGame(t *testing.T) {
+	a := testApp(t)
+	model, _ := a.Update(launcherSelectMsg{item: launcher2048})
+	a = model.(App)
+	if a.view != view2048 {
+		t.Fatal("expected view2048")
+	}
+	model, _ = a.Update(g2048ui.BackMsg{})
+	a = model.(App)
+	model, _ = a.Update(launcherSelectMsg{item: launcher2048})
+	a = model.(App)
+	if a.view != view2048 {
+		t.Fatal("expected view2048 on re-entry")
+	}
+	if !strings.Contains(a.View(), "SCORE 0") {
+		t.Fatalf("re-entered 2048 should start at score 0:\n%s", a.View())
 	}
 }
 
@@ -184,6 +257,8 @@ func solitaireIntField(t *testing.T, a App, name string) int {
 func TestLauncherQuit(t *testing.T) {
 	a := testApp(t)
 	model, _ := a.Update(key("down"))
+	a = model.(App)
+	model, _ = a.Update(key("down"))
 	a = model.(App)
 	model, _ = a.Update(key("down"))
 	a = model.(App)

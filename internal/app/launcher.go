@@ -12,6 +12,7 @@ type launcherItem int
 const (
 	launcherMines launcherItem = iota
 	launcherSolitaire
+	launcher2048
 	launcherQuit
 	launcherItemCount
 )
@@ -54,7 +55,7 @@ func selectLauncherItem(item launcherItem) tea.Cmd {
 }
 
 func (m launcherModel) View() string {
-	labels := []string{"Minesweeper", "Solitaire", "Quit"}
+	labels := []string{"Minesweeper", "Solitaire", "2048", "Quit"}
 	var b strings.Builder
 	b.WriteString("TERMINAL GAMES\n\n")
 	for i, label := range labels {
