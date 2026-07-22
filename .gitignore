@@ -1,5 +1,14 @@
-/mines
+# Built binaries
 /games
+/terminal-games
+
+# Test artifacts
 *.test
 coverage.out
+
+# Editor / OS
+.DS_Store
+
+# Local agent tooling
 .claude/
+.superpowers/
