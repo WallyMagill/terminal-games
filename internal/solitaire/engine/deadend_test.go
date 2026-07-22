@@ -87,6 +87,27 @@ func TestDeadEndFalseWhenCardBuriedInDeck(t *testing.T) {
 	}
 }
 
+func TestDeadEndFalseWhenCardSurfacesOnlyAfterPermutedRecycle(t *testing.T) {
+	// 7 cards: stock+waste ≢ 0 mod 3, so this engine's reverse-chunk recycle
+	// permutes the deck each cycle. The ace at index 4 is never a waste top
+	// in cycle 1; it surfaces only after a recycle reorders the deck.
+	// Length-based cycle detection would wrongly report a dead end here.
+	g := &Game{status: Playing}
+	g.tableau[0] = []TableauCard{{Card: Card{Suit: Hearts, Rank: Five}, FaceUp: true}}
+	g.stock = []Card{
+		{Suit: Clubs, Rank: Ten},
+		{Suit: Diamonds, Rank: Ten},
+		{Suit: Hearts, Rank: Ten},
+		{Suit: Spades, Rank: Ten},
+		{Suit: Clubs, Rank: Ace},
+		{Suit: Diamonds, Rank: Nine},
+		{Suit: Clubs, Rank: Queen},
+	}
+	if g.DeadEnd() {
+		t.Fatal("ace reachable only via permuted recycle must not be a dead end")
+	}
+}
+
 func TestDeadEndFalseWhenProductiveNowOrWon(t *testing.T) {
 	g := &Game{status: Playing}
 	g.tableau[0] = []TableauCard{{Card: Card{Suit: Clubs, Rank: Ace}, FaceUp: true}}
