@@ -132,7 +132,6 @@ func TestMenuEscRequestsLauncherBack(t *testing.T) {
 	}
 }
 
-
 func TestAppTooSmallTerminal(t *testing.T) {
 	a := testApp(t)
 	model, _ := a.Update(startGameMsg{preset: presets[2]}) // Expert: 30 wide → needs 91 cols
