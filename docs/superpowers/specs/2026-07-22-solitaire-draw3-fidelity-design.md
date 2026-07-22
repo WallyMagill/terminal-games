@@ -25,7 +25,7 @@ Revert the single-card draw slot to the classic three-card fan:
 
 - `topView` renders up to three cards from `WasteVisible()`, oldest → newest left to right; the rightmost is the top.
 - Only the top (rightmost) card is decorated for cursor/selection/show-moves; under-cards render plainly. Selection and engine semantics are unchanged — only the top card was ever playable.
-- Empty slots render nothing (blank space), as the original three-slot layout did; the `Deck` / `Draw` / `Foundations` labels stay.
+- Empty slots render the faint `[  ]` empty token (matching the foundations' empty style), as the original three-slot layout did; when the waste is entirely empty the rightmost slot is still cursor-decorated so the cursor never disappears on the draw pile. The `Deck` / `Draw` / `Foundations` labels stay.
 - `solitaireMinCols` (48) already accommodated the three-slot layout; it stays.
 
 ## 2. Classic recycle (engine)
